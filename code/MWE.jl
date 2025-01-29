@@ -7,20 +7,14 @@ using Distributions
   
    #make uptake matrix out of dirichlet distribution and make it modular
    du = Distributions.Dirichlet(N,1.0)
-   u = copy(rand(du, M)')
-   u_m =  MiCRM.Parameters.modular_uptake(M,N; N_modules = 2, s_ratio = 10.0)
-   u = u.*u_m
-
+   u =  MiCRM.Parameters.modular_uptake(M,N; N_modules = 2, s_ratio = 10.0)
    #cost term
    m = ones(N)
-
    #resource inflow + outflow
    ρ,ω = ones(M),ones(M)
 
    #make leakage matrix out of dirichlet distribution and make it modular
-   l = copy(rand(du,M)' .* leakage)
-   l_m = MiCRM.Parameters.modular_leakage(M; N_modules = 2, s_ratio = 10.0, λ = 0.5)
-   l = l_m*l
+   l = MiCRM.Parameters.modular_leakage(M; N_modules = 2, s_ratio = 10.0, λ = 0.5)
 
    #define parameters
    param = MiCRM.Parameters.generate_params(N, M;  u = u, m = m, ρ = ρ, ω = ω, l = l, λ = leakage)
@@ -41,15 +35,23 @@ using Distributions
    
    # jacobian of system from the solution object
    J = MiCRM.Analysis.get_jac(sol)
+   #test whether it is stiff
+   using LinearAlgebra
+   eigenvalues = eigvals(J) 
+   λ_max = maximum(abs.(eigenvalues)) 
+   λ_min = minimum(abs.(eigenvalues[eigenvalues .!= 0])) 
+   stiffness_ratio = λ_max / λ_min
+
    # calculate key properties
-   # generate purbulence matrix u to 
-   u = rand(size(J, 1))
-   # the instantaneous rate of growth of the perturbation u at time t.
-   MiCRM.Analysis.get_Rins(J, u, 1)
+   # generate purbulence matrix
+   pur = rand(size(J, 1))
+   # the instantaneous rate of growth of the perturbation pur at time t.
+   t = 5
+   MiCRM.Analysis.get_Rins(J, pur, t)
    # Determine the stability a system given its jaccobian by testing if the real part of the leading eigenvalue is positive.
    MiCRM.Analysis.get_stability(J)
-   #test whether a system is reactive to the perturbation 
-   #we need to analyze how the system responds to small disturbances. A reactive system is one where an initial perturbation amplifies in the short term before potentially stabilizing or decaying.
-   MiCRM.Analysis.get_reactivity(J,u)
+   #test whether a system is reactive to the perturbation pur
+   #A reactive system is one where an initial perturbation amplifies in the short term before potentially stabilizing or decaying.
+   MiCRM.Analysis.get_reactivity(J,pur)
    #get the rate of return of the system from perturbation
    MiCRM.Analysis.get_return_rate(J)

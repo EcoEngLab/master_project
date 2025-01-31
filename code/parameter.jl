@@ -1,5 +1,5 @@
 using Pkg
-Pkg.activate("/home/jiayi/Documents/digital_microbiome/MiCRM")
+Pkg.activate("/home/jiayi/Documents/digital_microbiome/MiCRM/packages")
 using MiCRM
 using Distributions
    #set system size and leakage

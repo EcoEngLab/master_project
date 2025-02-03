@@ -1,5 +1,5 @@
 using Pkg
-Pkg.activate("/home/ruizao/Documents/MiCRM/packages")
+Pkg.activate("packages")
 using MiCRM
 using Distributions
    #set system size and leakage

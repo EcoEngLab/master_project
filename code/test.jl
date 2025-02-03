@@ -1,9 +1,9 @@
 using Pkg
-Pkg.activate("/home/ruizao/Documents/MiCRM/packages")
+Pkg.activate("packages")
 using MiCRM
 using Distributions
    #set system size and leakage
-   N,M,leakage = 50,50,0.05
+   N,M,leakage = 50,50,0.3
   
    #make uptake matrix out of dirichlet distribution and make it modular
    u =  MiCRM.Parameters.modular_uptake(M,N; N_modules = 2, s_ratio = 10.0)
@@ -21,8 +21,8 @@ using Distributions
    param = MiCRM.Parameters.generate_params(N, M;  u = u, m = m, ρ = ρ, ω = ω, l = l, λ = leakage)
    
    #original state
-   x0 = vcat(0.1 .+ 0.2 .* rand(N),  # 物种的初始密度
-   1.0 .+ 0.5 .* rand(M))  # 资源的初始密度
+   x0 = vcat(0.1 .+ 0.2 .* rand(N),
+   1.0 .+ 0.5 .* rand(M)) 
 
    #time span
    tspan = (0.0, 10.0)
@@ -33,6 +33,10 @@ using Distributions
    sol = solve(prob, Tsit5())
 
    #visualize
+   dx_test = zeros(length(x0))
+   MiCRM.Simulations.dx!(dx_test, x0, param, 0.0)
+   println("dx values: ", dx_test)
+   
    using Plots
 
    sol_u = reduce(hcat, sol.u) 

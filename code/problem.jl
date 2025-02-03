@@ -2,14 +2,14 @@ using Pkg
 Pkg.activate("packages")
 using MiCRM
 using Distributions
-   #N is the number of species in system?
+
    N,M,leakage = 100,50,0.3
   
    #can we make it uneven? 30 % prefer one module and 70% other module of resource
    u =  MiCRM.Parameters.modular_uptake(M,N; N_modules = 2, s_ratio = 10.0)
    #why set to 1
    m = ones(N)
-   #the resource rate or amount? 
+   #rate or amount? 
    ρ,ω = ones(M),ones(M)
 
    #how exactly the s_ratio will affect the leakage structure
@@ -18,7 +18,7 @@ using Distributions
    #why do we need λ
    param = MiCRM.Parameters.generate_params(N, M;  u = u, m = m, ρ = ρ, ω = ω, l = l, λ = leakage)
    
-   #why set all population number to one
+   #why set all population size to one
    x0 = ones(N+M)
    #
    tspan = (0.0, 10.0)
@@ -43,7 +43,7 @@ using Distributions
 
    # 
    pur = rand(size(J, 1))
-   # it is different from the usage in website
+   # it is different from the usage on website
    t = 5
    MiCRM.Analysis.get_Rins(J, pur, t)
    # 

@@ -18,7 +18,7 @@ using Distributions
    #why do we need λ
    param = MiCRM.Parameters.generate_params(N, M;  u = u, m = m, ρ = ρ, ω = ω, l = l, λ = leakage)
    
-   #why set all population size to one
+   #why set all population and resource size to one
    x0 = ones(N+M)
    #
    tspan = (0.0, 10.0)
@@ -34,14 +34,6 @@ using Distributions
    
    #
    J = MiCRM.Analysis.get_jac(sol)
-   # do we need to test whether it is stiff
-   using LinearAlgebra
-   eigenvalues = eigvals(J) 
-   λ_max = maximum(abs.(eigenvalues)) 
-   λ_min = minimum(abs.(eigenvalues[eigenvalues .!= 0])) 
-   stiffness_ratio = λ_max / λ_min
-
-   # 
    pur = rand(size(J, 1))
    # it is different from the usage on website
    t = 5

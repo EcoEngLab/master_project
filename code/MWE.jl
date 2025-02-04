@@ -30,8 +30,12 @@ using Distributions
 
    #visualize
    using Plots
-   plot(sol, title="Consumer-Resource Dynamics", legend=:right, xlabel="Time", ylabel="Population/Resource")
-   
+   sol_u = reduce(hcat, sol.u)
+   N = 50 
+   M = 50  
+   plot(sol.t, sol_u[N+1:end, :]', color=:blue, label="Resource")
+   plot!(sol.t, sol_u[1:N, :]', color=:red, label="Species")
+
    # jacobian of system from the solution object
    J = MiCRM.Analysis.get_jac(sol)
    #test whether it is stiff

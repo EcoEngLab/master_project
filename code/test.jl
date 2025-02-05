@@ -3,25 +3,25 @@ Pkg.activate("packages")
 using MiCRM
 using Distributions
    #set system size and leakage
-   N,M,leakage = 50,50,0.03
+   N,M,leakage = 100,50,0.3
   
    #make uptake matrix out of dirichlet distribution and make it modular
    u =  MiCRM.Parameters.modular_uptake(M,N; N_modules = 10, s_ratio = 3.0)
    #cost term
    m = 0.05 * ones(N)
    #resource inflow + outflow
-   function resource_inflow(t)
-      return (mod(t, 2) == 1) ? 10 : 0 
-   end
-   ρ = [resource_inflow(t) for t in 0:10]
-
+   ρ = ones(N)
    ω = 0.03 * ones(N)
-   
-   #make leakage matrix out of dirichlet distribution and make it modular
-   l = MiCRM.Parameters.modular_leakage(M; N_modules = 5, s_ratio = 2.0, λ = leakage)
+   #make leakage matrix for each consumer and restore
+    leakage_matrices = []
+
+    for _ in 1:100
+        l = MiCRM.Parameters.modular_leakage(M; N_modules=5, s_ratio=2.0, λ=leakage)
+        push!(leakage_matrices, l)  
+    end
 
    #define parameters
-   param = MiCRM.Parameters.generate_params(N, M;  u = u, m = m, ρ = ρ, ω = ω, l = l, λ = leakage)
+   param = MiCRM.Parameters.generate_params(N, M;  u = u, m = m, ρ = ρ, ω = ω, l = leakage_matrices, λ = leakage)
    
    #original state
    x0 = ones(N+M) 
@@ -78,10 +78,27 @@ using Distributions
 #resource inflow and outflow
 using Plots
 # 计算 total_inflow 和 total_outflow
-t_values = 0:0.1:10  # 取多个时间点
+t_values = 0:0.1:10  
 total_inflow = [sum(resource_inflow(t)) for t in t_values]
 total_outflow = [sum(ω) + sum(l) for t in t_values]
 
 # 绘制结果
 plot(t_values, total_inflow, label="Total Resource Inflow", xlabel="Time", ylabel="Resource Flux", title="Resource Inflow and Outflow over Time")
 plot!(t_values, total_outflow, label="Total Resource Outflow", linestyle=:dash)
+# check maintenance
+println("Total metabolic cost: ", sum(m))
+println("Total uptake capacity: ", sum(u))
+
+using JSON
+data = Dict(
+    "u" => u,
+    "m" => m,
+    "ρ" => ρ,
+    "l" =>leakage_matrices,
+    "ω" =>ω
+)
+
+# 保存 JSON 文件
+open("data.json", "w") do f
+    JSON.print(f, data)
+end

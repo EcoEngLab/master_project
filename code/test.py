@@ -3,17 +3,17 @@ import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 import json
 
-# 读取 JSON 文件
+# read JSON
 with open("data.json", "r") as f:
     data = json.load(f)
 
-# 转换为 NumPy 数组
+# convert to NumPy
 import numpy as np
 data_np = {key: np.array(value) for key, value in data.items()}
 
 
-N = 100  # 消费者数量
-M = 50  # 资源数量
+N = 100 
+M = 50
 
 
 u = data_np["u"]  
@@ -55,23 +55,23 @@ t_eval = np.linspace(*t_span, 300)
 
 sol = solve_ivp(dCdt_Rdt, t_span, Y0, t_eval=t_eval)
 
-
+# visualization
 import matplotlib.pyplot as plt
 
 plt.figure(figsize=(10, 5))
 
-# 绘制消费者（蓝色）
+# consumer
 for i in range(N):
     plt.plot(sol.t, sol.y[i], color='blue', alpha=0.7)
 
-# 绘制资源（红色，虚线）
+# resource
 for alpha in range(M):
     plt.plot(sol.t, sol.y[N + alpha], color='red', linestyle='dashed', alpha=0.7)
 
 plt.xlabel('Time')
 plt.ylabel('Population / Resource')
 
-# **修改图例**
+# change legend
 consumer_legend = plt.Line2D([0], [0], color='blue', lw=2, label='Consumers')
 resource_legend = plt.Line2D([0], [0], color='red', linestyle='dashed', lw=2, label='Resources')
 plt.legend(handles=[consumer_legend, resource_legend])

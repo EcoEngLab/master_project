@@ -8,7 +8,7 @@ import param
 N = 5  # consumer number
 M = 5  # resource number
 λ = 0.3  # total leakage rate
-λ_u = 0.9
+λ_u = np.ones(N)
 
 N_modules = 2 #  module number of consumer to resource
 s_ratio = 10.0 

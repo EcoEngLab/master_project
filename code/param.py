@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def modular_uptake(N, M, N_modules, s_ratio, λ_u):
+def modular_uptake(N, M, N_modules, s_ratio):
     assert N_modules <= M and N_modules <= N, "N_modules must be less than or equal to both M and N"
 
     # Baseline calculations
@@ -22,15 +22,15 @@ def modular_uptake(N, M, N_modules, s_ratio, λ_u):
     mC = [list(range(x - 1, y)) for x, y in zip((np.cumsum(diffC) - diffC + 1), np.cumsum(diffC))]
 
     # Preallocate u matrix
-    u_raw = np.random.rand(N, M)
-    u = u_raw * λ_u[:, np.newaxis]
+    u = np.random.rand(N, M)
+
     # Apply scaling
     for x, y in zip(mC, mR):
         u[np.ix_(x, y)] *= s_ratio
 
-    # Normalize each row and apply λ scaling
+    # Normalize each row
     for i in range(N):
-        u[i, :] = λ_u[i] * u[i, :] / np.sum(u[i, :])
+        u[i, :] /= np.sum(u[i, :])
 
     return u
 

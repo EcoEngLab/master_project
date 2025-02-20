@@ -1,59 +1,70 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
-from scipy.stats import linregress
-import param
+from scipy.optimize import curve_fit
+import sys
+import os
 
+# Manually add the directory where param_3D.py is located
+sys.path.append(os.path.expanduser("~/Documents/MiCRM/code"))
+import param_3D
 
-# parameters
-N = 20 # consumer number
-M = 10  # resource number
-λ = 0.3  # total leakage rate
-λ_u = np.ones(N)  # 每个 consumer 的 uptake scaling factor
+np.random.seed(30) 
+# Parameters
+N = 20 # Number of consumers
+M = 12 # Number of resources
+λ = 0.3  # Total leakage rate
 
-N_modules = 5  # module number of consumer to resource
-s_ratio = 10.0  
+# Each consumer's uptake scaling factor
+λ_u = np.random.uniform(2, 2.5, N)  
+σ = np.random.uniform(0.05 * λ_u, 0.2 * λ_u)
+N_modules = 5  # Number of modules connecting consumers to resources
+s_ratio = 4.0  # Strength of modularity
 
-# Generate uptake matrix
-u = param.modular_uptake(N, M, N_modules, s_ratio, λ_u)  # uptake matrix
-lambda_alpha = np.full(M, λ)  # total leakage rate for each resource
+# Generate uptake matrix, defining consumer-resource interaction strengths
+u = param_3D.modular_uptake(N, M, N_modules, s_ratio, λ_u, σ)  
+print(u)
+# Total leakage rate for each resource
+lambda_alpha = np.full(M, λ)  
 
-m = np.full(N, 0.2)  # mortality rate of N consumers
-rho = np.full(M, 1)  # input of M resources
-omega = np.full(M, 0.05)  # decay rate of M resources
+# Mortality rate for each consumer
+m = np.full(N, 0.2)  
+# Input rate of each resource
+rho = np.full(M, 1)  
+# Decay rate for each resource
+omega = np.full(M, 0.01)  
 
-l = param.generate_l_tensor(N, M, N_modules, s_ratio, λ)  # a tensor for all consumers' leakage matrices
+# Generate leakage tensor representing leakage flow between consumers and resources
+l = param_3D.generate_l_tensor(N, M, N_modules, s_ratio, λ)  
 
-
-# ODE system
+# ODE system describing the dynamics of consumers (C) and resources (R)
 def dCdt_Rdt(t, y):
-    C = y[:N]
-    R = y[N:]
+    C = y[:N]  # Consumer populations
+    R = y[N:]  # Resource concentrations
     dCdt = np.zeros(N)
     dRdt = np.zeros(M)
     
+    # Consumer growth equation
     for i in range(N):
         dCdt[i] = sum(C[i] * R[alpha] * u[i, alpha] * (1 - lambda_alpha[alpha]) for alpha in range(M)) - C[i] * m[i]
     
+    # Resource depletion and leakage equation
     for alpha in range(M):
-        dRdt[alpha] = rho[alpha] - R[alpha] * omega[alpha]
-        dRdt[alpha] -= sum(C[i] * R[alpha] * u[i, alpha] for i in range(N))
-        dRdt[alpha] += sum(sum(C[i] * R[beta] * u[i, beta] * l[i, beta, alpha] for beta in range(M)) for i in range(N))
+        dRdt[alpha] = rho[alpha] - R[alpha] * omega[alpha]  # Input and decay
+        dRdt[alpha] -= sum(C[i] * R[alpha] * u[i, alpha] for i in range(N))  # Uptake by consumers
+        dRdt[alpha] += sum(sum(C[i] * R[beta] * u[i, beta] * l[i, beta, alpha] for beta in range(M)) for i in range(N))  # Leakage contributions
     
     return np.concatenate([dCdt, dRdt])
-
-# Initial values
-C0 = np.full(N, 1)  # consumer
-R0 = np.full(M, 1)  # resource
+    
+# Initial conditions: assume all consumers and resources start at concentration 1
+C0 = np.full(N, 1)
+R0 = np.full(M, 1)
 Y0 = np.concatenate([C0, R0])
-
-# Time scale
+    
 t_span = (0, 500)
 t_eval = np.linspace(*t_span, 300)
-
-# Solve ODE
 sol = solve_ivp(dCdt_Rdt, t_span, Y0, t_eval=t_eval)
-
+    
 # Compute CUE at each time step
 CUE = np.zeros((N, len(sol.t)))
 for i, t in enumerate(sol.t):
@@ -63,53 +74,78 @@ for i, t in enumerate(sol.t):
     net_uptake = total_uptake * (1 - λ) - m  
     CUE[:, i] = net_uptake / total_uptake  
 
-# 计算最终 CUE 值
+# Final CUE value 
 final_CUE = CUE[:, -1]
+u_variance = np.var(u, axis=1, ddof=0)  # Variance of uptake per consumer
+u_mean = np.mean(u, axis=1)  # Mean uptake per consumer
+print(np.corrcoef(u_mean, u_variance))
 
-# 绘制 Consumers and Resources 动态变化
-plt.figure(figsize=(10, 5))
+# community CUE
+initial_C = sol.y[:N, 0] 
+final_C = sol.y[:N, -1]  
+total_C_change = np.sum(final_C - initial_C)
+
+initial_R = sol.y[N:, 0]  # 初始资源丰度
+final_R = sol.y[N:, -1]  # 平衡态资源丰度
+total_R_change = np.sum(rho*t - final_R)
+total_R_used = total_R_change + np.sum(rho)
+
+
+CUE_community = total_C_change / total_R_used if total_R_used > 0 else 0
+print("Community CUE:", CUE_community)
+
+
+# plot dynamics of Consumers and Resources
+plt.figure(figsize=(12, 6))
+
 for i in range(N):
     plt.plot(sol.t, sol.y[i], label=f'Consumer {i+1}')
-
 for alpha in range(M):
     plt.plot(sol.t, sol.y[N + alpha], label=f'Resource {alpha+1}', linestyle='dashed')
 
 plt.xlabel('Time')
-plt.ylabel('Consumer / Resource Abundance')
+plt.ylabel('Consumer / Resource')
+plt.legend(loc='upper left', bbox_to_anchor=(1.05, 1), ncol=2, fontsize=10, columnspacing=1.5)
 plt.title('Dynamics of Consumers and Resources')
-
-# 在曲线旁边标注 CUE 值和 λ_u
-for i in range(N):
-    x_pos = sol.t[-1]  # 取最后一个时间点的 x 坐标
-    y_pos = sol.y[i, -1]  # 取最后一个时间点的 y 坐标
-    plt.text(x_pos, y_pos, f'CUE: {final_CUE[i]:.2f}\nλ_u: {λ_u[i]:.2f}', 
-             fontsize=10, verticalalignment='bottom')
-
-plt.legend()
+plt.tight_layout()
+plt.savefig("results/dynamics_of_consumers_resources.png", dpi=300, bbox_inches='tight')
 plt.show()
 
-# 绘制 CUE 变化图
-#plt.figure(figsize=(10, 5))
-#for i in range(N):
- #   plt.plot(sol.t, CUE[i], label=f'Consumer {i+1} (Final CUE: {final_CUE[i]:.2f})')
+# Create an interactive 3D scatter plot
+import plotly.graph_objects as go
+fig = go.Figure(data=[go.Scatter3d(
+    x=u_mean,
+    y=u_variance,
+    z=final_CUE,
+    mode='markers',
+    marker=dict(
+        size=5,
+        color=final_CUE,  # Color mapped to CUE values
+        colorscale='viridis',
+        opacity=0.8
+    )
+)])
 
-#plt.xlabel('Time')
-#plt.ylabel('Carbon Use Efficiency (CUE)')
-#plt.title('CUE Dynamics Over Time')
-#plt.legend()
-#plt.show()
-# 计算每个 consumer 的 uptake 均值和方差
-u_mean = np.mean(u, axis=1)
-u_variance = np.var(u, axis=1, ddof=0)
-cor_mean_variance = np.corrcoef(u_mean, u_variance)[0, 1]
-# 计算最终 CUE 值
-final_CUE = CUE[:, -1]                                               
-# 线性回归函数
+# Configure axis labels and title
+fig.update_layout(
+    scene=dict(
+        xaxis_title="Uptake Mean",
+        yaxis_title="Uptake Variance",
+        zaxis_title="CUE"
+    ),
+    title="3D Interactive Scatter Plot of CUE vs. Uptake Mean & Variance"
+)
+
+# Save the plot as an HTML file
+fig.write_html("results/CUE_uptake.html")
+
+# Show the interactive plot
+fig.show()
+# linear regression
+from scipy.stats import linregress
 def plot_regression(x, y, xlabel, ylabel, title):
     plt.figure(figsize=(7, 5))
     plt.scatter(x, y, label='Data points', color='b')
-    
-    # 计算线性拟合
     slope, intercept, r_value, p_value, std_err = linregress(x, y)
     x_fit = np.linspace(min(x), max(x), 100)
     y_fit = slope * x_fit + intercept
@@ -121,25 +157,10 @@ def plot_regression(x, y, xlabel, ylabel, title):
     plt.title(title)
     plt.legend()
     plt.show()
-
-# 画 u_mean vs. CUE 关系
-plot_regression(u_mean, final_CUE, "Uptake Mean", "Final CUE", "Uptake Mean vs. CUE")
-
-# 画 u_variance vs. CUE 关系
-from scipy.optimize import curve_fit
-def log_func(x, a, b):
-    return a + b * np.log(x)
-
-popt, pcov = curve_fit(log_func, u_variance, final_CUE)
-
-x_fit = np.linspace(min(u_variance), max(u_variance), 100)
-y_fit = log_func(x_fit, *popt)
-
-plt.figure(figsize=(7, 5))
-plt.scatter(u_variance, final_CUE, color='b', label="Data points")
-plt.plot(x_fit, y_fit, 'r--', label=f'Fit: y={popt[0]:.2f} + {popt[1]:.2f}ln(x)')
-plt.xlabel("Uptake Variance")
-plt.ylabel("Final CUE")
-plt.title("Uptake Variance vs. CUE")
-plt.legend()
-plt.show()
+plot_regression(
+    u_mean, final_CUE,
+    xlabel="Uptake Mean",
+    ylabel="Final CUE",
+    title="Linear Regression of Final CUE vs. Uptake Mean"
+)
+plt.savefig("results/linear_regression_of_consumers_resources.png", dpi=300, bbox_inches='tight')

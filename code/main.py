@@ -16,7 +16,7 @@ s_ratio = 10.0
 # When s_ratio > 1: Increases leakage probability within the same module, Increases leakage probability between adjacent modules.
 
 
-u = param.modular_uptake(N, M, N_modules, s_ratio, λ_u)  # uptake matrix
+u = param.modular_uptake(N, M, N_modules, s_ratio)  # uptake matrix
 row_sums = np.sum(u, axis=1)
 
 lambda_alpha = np.full(M, λ)  # total leakage rate for each resource

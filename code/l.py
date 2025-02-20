@@ -10,20 +10,20 @@ N = 10 # consumer number
 M = 10  # resource number
 λ = 0.3  # total leakage rate
 λ_u = np.random.uniform(0.5, 1, N)  # 每个 consumer 的 uptake scaling factor
-λ_l =  np.random.uniform(0, 0.3, N)
+λ_l =  np.random.uniform(0, 0.3, M)
 
 N_modules = 5  # module number of consumer to resource
 s_ratio = 10.0  
 
 # Generate uptake matrix
 u = param_l.modular_uptake(N, M, N_modules, s_ratio, λ_u)  # uptake matrix
-lambda_alpha = np.full(M, λ)  # total leakage rate for each resource
+lambda_alpha = λ_l  # total leakage rate for each resource
 
 m = np.full(N, 0.2)  # mortality rate of N consumers
 rho = np.full(M, 1)  # input of M resources
 omega = np.full(M, 0.05)  # decay rate of M resources
 
-l = param_l.generate_l_tensor(N, M, N_modules, s_ratio, λ)  # a tensor for all consumers' leakage matrices
+l = param_l.generate_l_tensor(N, M, N_modules, s_ratio, λ_l)  # a tensor for all consumers' leakage matrices
 
 
 # ODE system

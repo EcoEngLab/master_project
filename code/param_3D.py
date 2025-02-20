@@ -35,14 +35,16 @@ def modular_uptake(N, M, N_modules, s_ratio, λ_u,σ = 1):
 
     # 2. 使用 λ_u[i] 调整每行的均值
     for i in range(N):
-        u = u_raw * σ[:, np.newaxis]  + λ_u[:, np.newaxis]
+        u[i, :] = u_raw[i, :] * σ[i]  + λ_u[i]
+    # 归一化到 (0,1)
+    u_min = np.min(u)
+    u_max = np.max(u)
+    u = (u - u_min) / (u_max - u_min)
 
 
     return u
 
-
-
-def modular_leakage(M, N_modules, s_ratio, λ_l):
+def modular_leakage(M, N_modules, s_ratio, λ):
     assert N_modules <= M, "N_modules must be less than or equal to M"
 
     # Baseline
@@ -62,7 +64,7 @@ def modular_leakage(M, N_modules, s_ratio, λ_l):
                 l[np.ix_(x, y)] *= s_ratio
 
     for i in range(M):
-        l[i, :] = λ_l * l[i, :] / np.sum(l[i, :])
+        l[i, :] = λ * l[i, :] / np.sum(l[i, :])
 
     return l
 
@@ -70,4 +72,3 @@ def modular_leakage(M, N_modules, s_ratio, λ_l):
 def generate_l_tensor(N, M, N_modules, s_ratio, λ):
     l_tensor = np.array([modular_leakage(M, N_modules, s_ratio, λ) for _ in range(N)])
     return l_tensor
-

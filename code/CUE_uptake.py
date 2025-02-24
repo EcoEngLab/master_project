@@ -16,7 +16,7 @@ M = 12 # Number of resources
 λ = 0.3  # Total leakage rate
 
 # Each consumer's uptake scaling factor
-λ_u = np.random.uniform(2, 2.5, N)  
+λ_u = np.random.uniform(0.8, 1, N)  
 σ = np.random.uniform(0.05 * λ_u, 0.2 * λ_u)
 N_modules = 5  # Number of modules connecting consumers to resources
 s_ratio = 4.0  # Strength of modularity
@@ -57,7 +57,7 @@ def dCdt_Rdt(t, y):
     return np.concatenate([dCdt, dRdt])
     
 # Initial conditions: assume all consumers and resources start at concentration 1
-C0 = np.full(N, 1)
+C0 = np.full(N, 0.1)
 R0 = np.full(M, 1)
 Y0 = np.concatenate([C0, R0])
     
@@ -65,14 +65,15 @@ t_span = (0, 500)
 t_eval = np.linspace(*t_span, 300)
 sol = solve_ivp(dCdt_Rdt, t_span, Y0, t_eval=t_eval)
     
+# CUE
 # Compute CUE at each time step
 CUE = np.zeros((N, len(sol.t)))
 for i, t in enumerate(sol.t):
-    C = sol.y[:N, i]  
-    R = sol.y[N:, i]  
-    total_uptake = u @ (R0-R)  
-    net_uptake = total_uptake * (1 - λ) - m  
-    CUE[:, i] = net_uptake / total_uptake  
+    C = sol.y[:N, i]  # Consumer abundances at time t
+    R = sol.y[N:, i]  # Resource concentrations at time t
+    total_uptake = u @ R  # (N × M) @ (M,) -> (N,)
+    net_uptake = total_uptake * (1 - λ) - m  # Adjusted for leakage and metabolism
+    CUE[:, i] = net_uptake / total_uptake  # Compute CUE per consumer
 
 # Final CUE value 
 final_CUE = CUE[:, -1]
@@ -81,19 +82,34 @@ u_mean = np.mean(u, axis=1)  # Mean uptake per consumer
 print(np.corrcoef(u_mean, u_variance))
 
 # community CUE
-initial_C = sol.y[:N, 0] 
-final_C = sol.y[:N, -1]  
-total_C_change = np.sum(final_C - initial_C)
+# Compute total resource input (denominator of efficiency)
+total_input = np.sum(rho)
 
-initial_R = sol.y[N:, 0]  # 初始资源丰度
-final_R = sol.y[N:, -1]  # 平衡态资源丰度
-total_R_change = np.sum(rho*t - final_R)
-total_R_used = total_R_change + np.sum(rho)
+# Compute steady-state CUE using final time point
+C_final = sol.y[:N, -1]  # Consumer biomass at the final time point
+energy_used_final = np.sum(C_final * m)  # Total energy dissipated via mortality at steady state
+efficiency_final = energy_used_final / total_input  # Steady-state efficiency
 
+# Compute efficiency trajectory and time-averaged efficiency
+C_traj = sol.y[:N, :]  # Consumer biomass over time
+energy_used_traj = np.sum(C_traj * m[:, np.newaxis], axis=0)  # Energy dissipated via mortality at each time point
+efficiency_traj = energy_used_traj / total_input  # Efficiency trajectory over time
+efficiency_avg = np.mean(efficiency_traj)  # Time-averaged efficiency
 
-CUE_community = total_C_change / total_R_used if total_R_used > 0 else 0
-print("Community CUE:", CUE_community)
+# Output efficiency results
+print(f"Steady-state CUE: {efficiency_final:.4f}")
+print(f"Time-averaged CUE: {efficiency_avg:.4f}")
 
+# Plot efficiency over time
+plt.figure(figsize=(10, 5))
+plt.plot(sol.t, efficiency_traj, label='Efficiency', linewidth=2)
+plt.xlabel('Time', fontsize=20)
+plt.ylabel('CUE', fontsize=20)
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
+plt.legend()
+plt.title('CUE Over Time', fontsize=20)
+plt.show()
 
 # plot dynamics of Consumers and Resources
 plt.figure(figsize=(12, 6))

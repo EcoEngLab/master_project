@@ -82,8 +82,6 @@ def generate_l_tensor(N, M, N_modules, s_ratio, λ):
     return l_tensor
 
 
-import numpy as np
-
 def compute_m(kaf0, epsilon, λ, u):
     """
     Compute the m vector for all species using a loop, ensuring that each species 

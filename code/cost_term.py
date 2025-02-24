@@ -10,13 +10,13 @@ sys.path.append(os.path.expanduser("~/Documents/MiCRM/code"))
 import param_resource
 np.random.seed(30) 
 # Parameters
-N = 12 # Number of consumers
-M = 10 # Number of resources
+N = 20# Number of consumers
+M = 12 # Number of resources
 λ = 0.3  # Total leakage rate
 kaf0 = 0.2
 epsilon = np.random.normal(0, 0.1, N)
-λ_u = np.ones(N)
-σ = np.random.uniform(0.1, 1, N)
+λ_u = np.random.uniform(0.8, 1, N)  
+σ = np.random.uniform(0.05 * λ_u, 0.2 * λ_u)
 N_modules = 5  # Number of modules connecting consumers to resources
 s_ratio = 10.0  # Strength of modularity
 
@@ -74,7 +74,9 @@ for i, t in enumerate(sol.t):
     total_uptake = u @ (R0-R)  
     net_uptake = total_uptake * (1 - λ) - m  
     CUE[:, i] = net_uptake / total_uptake  
-
+final_CUE = CUE[:, -1]
+u_variance = np.var(u, axis=1, ddof=0)  # Variance of uptake per consumer
+u_mean = np.mean(u, axis=1)  # Mean uptake per consumer
 # plot
 plt.figure(figsize=(10, 5))
 for i in range(N):

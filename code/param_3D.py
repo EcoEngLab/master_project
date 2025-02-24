@@ -1,48 +1,55 @@
 import numpy as np
 
-def modular_uptake(N, M, N_modules, s_ratio, λ_u,σ = 1):
+def modular_uptake(N, M, N_modules, s_ratio, λ_u, σ=1):
     assert N_modules <= M and N_modules <= N, "N_modules must be less than or equal to both M and N"
-
+    
+    # Ensure σ is an array of shape (N,)
+    if np.isscalar(σ):
+        σ = np.full(N, σ)
+    
     # Baseline calculations
     sR = M // N_modules
     dR = M - (N_modules * sR)
-
+    
     sC = N // N_modules
     dC = N - (N_modules * sC)
-
+    
     # Get module sizes for M
     diffR = np.full(N_modules, sR, dtype=int)
     diffR[np.random.choice(N_modules, dR, replace=False)] += 1
-    mR = [list(range(x - 1, y)) for x, y in zip((np.cumsum(diffR) - diffR + 1), np.cumsum(diffR))]
-
+    mR = [list(range(x, y)) for x, y in zip(np.cumsum(diffR) - diffR, np.cumsum(diffR))]
+    
     # Get module sizes for N
     diffC = np.full(N_modules, sC, dtype=int)
     diffC[np.random.choice(N_modules, dC, replace=False)] += 1
-    mC = [list(range(x - 1, y)) for x, y in zip((np.cumsum(diffC) - diffC + 1), np.cumsum(diffC))]
-
-    # Preallocate u matrix
+    mC = [list(range(x, y)) for x, y in zip(np.cumsum(diffC) - diffC, np.cumsum(diffC))]
+    
+    # Initialize u_raw with uniform random values in [0,1]
     u_raw = np.random.rand(N, M)
-    u = np.zeros((N, M))
-
-    # Apply scaling
+    
+    # Apply scaling to modular structure
     for x, y in zip(mC, mR):
         u_raw[np.ix_(x, y)] *= s_ratio
-
-    # 1. 标准化每一行，使得每行的标准差为 target_std
-    row_mean = np.mean(u_raw, axis=1, keepdims=True)  # 计算每行均值
-    row_std = np.std(u_raw, axis=1, keepdims=True)  # 计算每行标准差
-    u_raw = (u_raw - row_mean) / row_std  # 去均值并缩放到标准差为 1
-
-    # 2. 使用 λ_u[i] 调整每行的均值
-    for i in range(N):
-        u[i, :] = u_raw[i, :] * σ[i]  + λ_u[i]
-    # 归一化到 (0,1)
+    
+    # Standardize u_raw (zero mean, unit variance per row)
+    row_mean = np.mean(u_raw, axis=1, keepdims=True) 
+    row_std = np.std(u_raw, axis=1, keepdims=True) 
+    u_raw = (u_raw - row_mean) / row_std  
+    
+    # Apply scaling with σ
+    u = u_raw * σ[:, np.newaxis]  # Ensure broadcasting across columns
+    
+    # Normalize u to [0,1]
     u_min = np.min(u)
     u_max = np.max(u)
     u = (u - u_min) / (u_max - u_min)
-
-
+    
+    # Adjust row sums using λ_u
+    row_sums = np.sum(u, axis=1, keepdims=True)
+    u = u * (λ_u[:, np.newaxis] / row_sums)  # Scale each row to match λ_u
+    
     return u
+
 
 def modular_leakage(M, N_modules, s_ratio, λ):
     assert N_modules <= M, "N_modules must be less than or equal to M"

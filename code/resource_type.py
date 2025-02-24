@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
-from scipy.optimize import curve_fit
 import sys
 import os
 
@@ -114,6 +113,6 @@ def plot_regression(x, y, xlabel, ylabel, title):
     plt.show()
 plot_regression(
     u_sum, final_CUE,
-    xlabel="Uptake sum",
+    xlabel="Sum of Resource uptake type",
     ylabel="Final CUE",
-    title="Linear Regression of Final CUE vs. Uptake Variance")
+    title="Linear Regression of Final CUE vs. Resource uptake type")

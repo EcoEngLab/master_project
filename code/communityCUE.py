@@ -60,7 +60,7 @@ C0 = np.full(N, 0.1)
 R0 = np.full(M, 1)
 Y0 = np.concatenate([C0, R0])
     
-t_span = (0, 500)
+t_span = (0, 700)
 t_eval = np.linspace(*t_span, 300)
 sol = solve_ivp(dCdt_Rdt, t_span, Y0, t_eval=t_eval)
     
@@ -76,100 +76,26 @@ for i, t in enumerate(sol.t):
 # Final CUE value 
 final_CUE = CUE[:, -1]
 print(final_CUE)
-#cue second method
-CUE2 = (u @ (R0+rho*t-omega*t-R) * (1 - λ) - m) / (u @ (R0+rho*t-omega*t-R))
-print(CUE2)
 
+# Calculate community CUE
+# Compute total resource input (denominator of efficiency)
+total_input = np.sum(rho)
 
+# Compute steady-state CUE using final time point
+C_final = sol.y[:N, -1]  # Consumer biomass at the final time point
+energy_used_final = np.sum(C_final * m)  # Total energy dissipated via mortality at steady state
+efficiency_final = energy_used_final / total_input  # Steady-state efficiency
 
-
-# Example data
-t_eval = np.linspace(0, 100, 1000)  # Time points (from 0 to 100, with 1000 steps)
-C_traj = 1 - np.exp(-0.1 * t_eval)  # Simulated species growth towards steady state at 1
-
-# Compute the time to reach steady state
-steady_time = get_steady_state_time(C_traj, t_eval)
-
-u_variance = np.var(u, axis=1, ddof=0)  # Variance of uptake per consumer
-u_mean = np.mean(u, axis=1)  # Mean uptake per consumer
-
-# Calculate community energy efficiency based on net energy intake
-total_input = np.sum(rho)  # Total resource input
-# Compute net energy intake trajectory
+# Compute efficiency trajectory and time-averaged efficiency
 C_traj = sol.y[:N, :]  # Consumer biomass over time
-R_traj = sol.y[N:, :]  # Resource concentration over time
-net_intake_traj = np.zeros(len(t_eval))
-for t in range(len(t_eval)):
-    net_intake = 0
-    for i in range(N):
-        for alpha in range(M):
-            net_intake += C_traj[i, t] * R_traj[alpha, t] * u[i, alpha] * (1 - lambda_alpha[alpha])
-    net_intake_traj[t] = net_intake
-efficiency_traj = net_intake_traj / total_input  # Efficiency trajectory
-efficiency_final = efficiency_traj[-1]  # Steady-state efficiency
+energy_used_traj = np.sum(C_traj * m[:, np.newaxis], axis=0)  # Energy dissipated via mortality at each time point
+efficiency_traj = energy_used_traj / total_input  # Efficiency trajectory over time
 efficiency_avg = np.mean(efficiency_traj)  # Time-averaged efficiency
-
-# community CUE 2
-total_input = np.sum(R0+rho*t-omega*t-R)
-def get_steady_state_time(C_traj, t_eval, epsilon=1e-4):
-    """
-    Compute the time required for each species in C_traj to reach steady state.
-
-    Parameters:
-    - C_traj (array, shape: N x T): Biomass trajectories for N species over T time points
-    - t_eval (array, shape: T): Time points corresponding to C_traj
-    - epsilon (float): Threshold for steady state detection (default: 1e-4)
-
-    Returns:
-    - steady_times (array, shape: N): Time at which each species reaches steady state
-    """
-    N, T = C_traj.shape  # Number of species (N) and time steps (T)
-    steady_times = np.full(N, t_eval[-1])  # Default to the last time point
-
-    # Compute the absolute rate of change for each species
-    dC_dt = np.abs(np.diff(C_traj, axis=1) / np.diff(t_eval))
-
-    # Find steady state time for each species
-    for i in range(N):
-        for t_idx, rate in enumerate(dC_dt[i, :]):
-            if rate < epsilon:
-                steady_times[i] = t_eval[t_idx]  # First time the species stabilizes
-                break  # Stop checking once steady state is found
-
-    return steady_times
-
-# Compute the time to reach steady state
-steady_time = get_steady_state_time(C_traj, t_eval)
-print(steady_time)
-def compute_biomass_integral(C_traj, t_eval, steady_times):
-    """
-    Compute the integral of biomass change over time for each species until steady state.
-
-    Parameters:
-    - C_traj (array, shape: N x T): Biomass trajectories for N species over T time points
-    - t_eval (array, shape: T): Time points corresponding to C_traj
-    - steady_times (array, shape: N): Steady-state time for each species
-
-    Returns:
-    - biomass_integrals (array, shape: N): Integral of biomass over time until steady state
-    """
-    N, T = C_traj.shape
-    biomass_integrals = np.zeros(N)
-
-    for i in range(N):
-        # Find the index where time reaches the steady state time
-        t_s_index = np.searchsorted(t_eval, steady_times[i])
-
-        # Compute the integral from t=0 to t_s using the trapezoidal rule
-        biomass_integrals[i] = np.trapz(C_traj[i, :t_s_index], t_eval[:t_s_index])
-
-    return biomass_integrals
-compute_biomass_integral(C_traj, t_eval, steady_time)
 
 # Output efficiency results
 print(f"Steady-state CUE: {efficiency_final:.4f}")
 print(f"Time-averaged CUE: {efficiency_avg:.4f}")
-print(f"Maximum CUE: {np.max(efficiency_traj):.4f}")  # Check if exceeds 1
+
 # Plot efficiency over time
 plt.figure(figsize=(10, 5))
 plt.plot(sol.t, efficiency_traj, label='Efficiency', linewidth=2)

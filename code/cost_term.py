@@ -6,9 +6,9 @@ import os
 
 # Manually add the directory where param_3D.py is located
 sys.path.append(os.path.expanduser("~/Documents/MiCRM/code"))
-
 import param_resource
 np.random.seed(30) 
+
 # Parameters
 N = 20# Number of consumers
 M = 12 # Number of resources
@@ -62,32 +62,18 @@ C0 = np.full(N, 1)
 R0 = np.full(M, 1)
 Y0 = np.concatenate([C0, R0])
     
-t_span = (0, 500)
+t_span = (0, 600)
 t_eval = np.linspace(*t_span, 300)
 sol = solve_ivp(dCdt_Rdt, t_span, Y0, t_eval=t_eval)
 
 # Compute CUE at each time step
-CUE = np.zeros((N, len(sol.t)))
-for i, t in enumerate(sol.t):
-    C = sol.y[:N, i]  
-    R = sol.y[N:, i]  
-    total_uptake = u @ (R0-R)  
-    net_uptake = total_uptake * (1 - λ) - m  
-    CUE[:, i] = net_uptake / total_uptake  
-final_CUE = CUE[:, -1]
-u_variance = np.var(u, axis=1, ddof=0)  # Variance of uptake per consumer
-u_mean = np.mean(u, axis=1)  # Mean uptake per consumer
-# plot
-plt.figure(figsize=(10, 5))
-for i in range(N):
-    plt.plot(sol.t, sol.y[i], label=f'Consumer {i+1}')
-for alpha in range(M):
-    plt.plot(sol.t, sol.y[N + alpha], label=f'Resource {alpha+1}', linestyle='dashed')
-plt.xlabel('Time')
-plt.ylabel('Comsumer / Resource')
-plt.legend()
-plt.title('Dynamics of Consumers and Resources')
-plt.show()
+# CUE
+CUE = np.zeros(N)
+total_uptake = np.sum(u * R0, axis=1)  # (N × M) @ (M,) -> (N,)
+net_uptake = np.sum(u * R0 *(1-lambda_alpha), axis=1)-m # Adjusted for leakage and metabolism
+CUE = net_uptake/total_uptake
+print(f"Carbon Use Efficiency (CUE): {CUE.tolist()}")
+
 
 # -------------------------- Logarithmic Model Fitting --------------------------
 

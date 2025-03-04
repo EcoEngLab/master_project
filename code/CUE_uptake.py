@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
-from scipy.optimize import curve_fit
 import sys
 import os
 
@@ -24,9 +23,9 @@ s_ratio = 4.0  # Strength of modularity
 # Generate uptake matrix, defining consumer-resource interaction strengths
 u = param_3D.modular_uptake(N, M, N_modules, s_ratio, λ_u, σ)  
 print(u)
+
 # Total leakage rate for each resource
 lambda_alpha = np.full(M, λ)  
-
 # Mortality rate for each consumer
 m = np.full(N, 0.2)  
 # Input rate of each resource
@@ -61,59 +60,62 @@ C0 = np.full(N, 0.1)
 R0 = np.full(M, 1)
 Y0 = np.concatenate([C0, R0])
     
-t_span = (0, 500)
+t_span = (0, 700)
 t_eval = np.linspace(*t_span, 300)
 sol = solve_ivp(dCdt_Rdt, t_span, Y0, t_eval=t_eval)
-    
+
 # CUE
-# Compute CUE at each time step
-CUE = np.zeros((N, len(sol.t)))
-for i, t in enumerate(sol.t):
-    C = sol.y[:N, i]  # Consumer abundances at time t
-    R = sol.y[N:, i]  # Resource concentrations at time t
-    total_uptake = u @ R  # (N × M) @ (M,) -> (N,)
-    net_uptake = total_uptake * (1 - λ) - m  # Adjusted for leakage and metabolism
-    CUE[:, i] = net_uptake / total_uptake  # Compute CUE per consumer
+CUE = np.zeros(N)
+total_uptake = np.sum(u * R0, axis=1)  # (N × M) @ (M,) -> (N,)
+net_uptake = np.sum(u * R0 *(1-lambda_alpha), axis=1)-m # Adjusted for leakage and metabolism
+CUE = net_uptake/total_uptake
+print(f"Carbon Use Efficiency (CUE): {CUE.tolist()}")
 
-# Final CUE value 
-final_CUE = CUE[:, -1]
-u_variance = np.var(u, axis=1, ddof=0)  # Variance of uptake per consumer
-u_mean = np.mean(u, axis=1)  # Mean uptake per consumer
-print(np.corrcoef(u_mean, u_variance))
+# find equilibrium state
+# Set the equilibrium threshold
+tolerance = 0.01  
 
-# community CUE
-# Compute total resource input (denominator of efficiency)
-total_input = np.sum(rho)
+# Compute the numerical derivative of dC/dt
+dC_dt_numeric = np.gradient(sol.y[:N, :], sol.t, axis=1)  # (N, T)
 
-# Compute steady-state CUE using final time point
-C_final = sol.y[:N, -1]  # Consumer biomass at the final time point
-energy_used_final = np.sum(C_final * m)  # Total energy dissipated via mortality at steady state
-efficiency_final = energy_used_final / total_input  # Steady-state efficiency
+# Step-by-step check to find the equilibrium state of R and CUE
+t_steady = None
+for idx in range(len(sol.t)):
+    if np.all(np.abs(dC_dt_numeric[:, idx]) < tolerance):  # Check if all dC/dt values are below the threshold
+        t_steady = sol.t[idx]  # Record the equilibrium time
+        C_steady = sol.y[:N, idx]  # Record the steady-state biomass (C)
+        R_steady = sol.y[N:, idx]  # Record the steady-state resource abundance (R)
+        break  # Stop searching once equilibrium is found
 
-# Compute efficiency trajectory and time-averaged efficiency
-C_traj = sol.y[:N, :]  # Consumer biomass over time
-energy_used_traj = np.sum(C_traj * m[:, np.newaxis], axis=0)  # Energy dissipated via mortality at each time point
-efficiency_traj = energy_used_traj / total_input  # Efficiency trajectory over time
-efficiency_avg = np.mean(efficiency_traj)  # Time-averaged efficiency
+# Print the results
+if t_steady is not None:
+    print(f"System reached steady state at t = {t_steady:.2f}")
+    print(f"Steady-state Biomass (C): {C_steady}")
+    print(f"Steady-state Resources (R): {R_steady}")
+else:
+    print("System did not reach steady state within the simulation time.")
 
-# Output efficiency results
-print(f"Steady-state CUE: {efficiency_final:.4f}")
-print(f"Time-averaged CUE: {efficiency_avg:.4f}")
-
-# Plot efficiency over time
-plt.figure(figsize=(10, 5))
-plt.plot(sol.t, efficiency_traj, label='Efficiency', linewidth=2)
-plt.xlabel('Time', fontsize=20)
-plt.ylabel('CUE', fontsize=20)
-plt.xticks(fontsize=20)
-plt.yticks(fontsize=20)
+# Plot the change of dC/dt over time
+plt.figure(figsize=(8, 5))
+for i in range(N):
+    plt.plot(sol.t, dC_dt_numeric[i], label=f'Consumer {i+1}')
+if t_steady is not None:
+    plt.axvline(x=t_steady, color='r', linestyle='--', label=f'Steady State at t={t_steady:.2f}')
+plt.xlabel("Time")
+plt.ylabel("dC/dt (Biomass Growth Rate)")
+plt.title("Change of dC/dt Over Time")
 plt.legend()
-plt.title('CUE Over Time', fontsize=20)
 plt.show()
 
-# plot dynamics of Consumers and Resources
-plt.figure(figsize=(12, 6))
+# community CUE
+# Compute total resource consumed by consumers
+total_resource_consumed = np.sum(rho) *t_steady  - np.sum(R_steady)
+# Compute biomass growth
+biomass_growth = np.sum(C_steady) - np.sum(C0)
+CUE_community = biomass_growth/total_resource_consumed
+print(f"Community-level Carbon Use Efficiency (CUE): {CUE_community:.4f}")
 
+# Visualize system dynamics
 for i in range(N):
     plt.plot(sol.t, sol.y[i], label=f'Consumer {i+1}')
 for alpha in range(M):
@@ -179,4 +181,98 @@ plot_regression(
     ylabel="Final CUE",
     title="Linear Regression of Final CUE vs. Uptake Mean"
 )
-plt.savefig("results/linear_regression_of_consumers_resources.png", dpi=300, bbox_inches='tight')
+# Use R equilibrium as system equilibrium
+# find equilibrium state
+# Set the equilibrium threshold
+tolerance = 0.001  
+
+# Compute the numerical derivative of dC/dt
+dR_dt_numeric = np.gradient(sol.y[N:, :], sol.t, axis=1)  # (N, T)
+
+# Step-by-step check to find the equilibrium state of R and CUE
+t_steady = None
+for idx in range(len(sol.t)):
+    if np.all(np.abs(dR_dt_numeric[:, idx]) < tolerance):  # Check if all dC/dt values are below the threshold
+        t_steady = sol.t[idx]  # Record the equilibrium time
+        C_steady = sol.y[:N, idx]  # Record the steady-state biomass (C)
+        R_steady = sol.y[N:, idx]  # Record the steady-state resource abundance (R)
+        break  # Stop searching once equilibrium is found
+
+# Print the results
+if t_steady is not None:
+    print(f"System reached steady state at t = {t_steady:.2f}")
+    print(f"Steady-state Biomass (C): {C_steady}")
+    print(f"Steady-state Resources (R): {R_steady}")
+else:
+    print("System did not reach steady state within the simulation time.")
+
+# Plot the change of dC/dt over time
+plt.figure(figsize=(8, 5))
+for i in range(N):
+    plt.plot(sol.t, dC_dt_numeric[i], label=f'Consumer {i+1}')
+if t_steady is not None:
+    plt.axvline(x=t_steady, color='r', linestyle='--', label=f'Steady State at t={t_steady:.2f}')
+plt.xlabel("Time")
+plt.ylabel("dC/dt (Biomass Growth Rate)")
+plt.title("Change of dC/dt Over Time")
+plt.legend()
+plt.show()
+
+# community CUE
+# Compute total resource consumed by consumers
+total_resource_consumed = np.sum(rho) *t_steady  - np.sum(R_steady)
+# Compute biomass growth
+biomass_growth = np.sum(C_steady) - np.sum(C0)
+CUE_community = biomass_growth/total_resource_consumed
+print(f"Community-level Carbon Use Efficiency (CUE): {CUE_community:.4f}")
+
+## cumulative community CUE
+C_values = sol.y[:N, :]
+R_values = sol.y[N:, :]
+
+# select ten time points
+time_indices = np.linspace(0, len(sol.t) - 1, 50, dtype=int)
+C_selected = C_values[:, time_indices]
+R_selected = R_values[:, time_indices]
+
+# calculate community cue
+dR = R_selected.sum(axis=0) - R0.sum() + sol.t[time_indices] * 12
+dR = dR[1:] 
+dC = C_selected.sum(axis=0) - C0.sum()
+dC = dC[1:] 
+COMMUNITYcue = dC/dR
+# print output
+for i, t_idx in enumerate(time_indices[1:]):
+    print(f"Time: {sol.t[t_idx]:.2f}, COMMUNITY CUE: {COMMUNITYcue[i]:.4f}")
+
+# visualization
+plt.figure(figsize=(8, 5))
+plt.plot(sol.t[time_indices[1:]], COMMUNITYcue, marker='o', linestyle='-', label='COMMUNITY CUE')
+plt.xlabel('Time')
+plt.ylabel('COMMUNITY CUE')
+plt.title('Cumulative Community CUE Over Time')
+plt.legend()
+plt.grid()
+plt.show()
+
+
+# instantaneous 
+# calculate the instataneous community cue between adjacent time points
+dR2 = (R_selected[:-1].sum(axis=0) - R_selected[0:].sum(axis=0)) 
+dR2 = dR2[1:] + 12 * (sol.t[time_indices[1:]] - sol.t[time_indices[:-1]])
+dC2 = C_selected[0:].sum(axis=0) - C_selected[:-1].sum(axis=0)
+dC2 = dC2 [1:] 
+COMMUNITYcue2 = dC2 / dR2
+# print output
+for i, t_idx in enumerate(time_indices[1:]):
+    print(f"Time: {sol.t[t_idx]:.2f}, COMMUNITY CUE: {COMMUNITYcue2[i]:.4f}")
+
+# visualization
+plt.figure(figsize=(8, 5))
+plt.plot(sol.t[time_indices[1:]], COMMUNITYcue2, marker='o', linestyle='-', label='COMMUNITY CUE')
+plt.xlabel('Time')
+plt.ylabel('COMMUNITY CUE')
+plt.title('Instataneous Community CUE Over Time')
+plt.legend()
+plt.grid()
+plt.show()

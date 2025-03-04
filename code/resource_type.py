@@ -66,17 +66,13 @@ t_span = (0, 500)
 t_eval = np.linspace(*t_span, 300)
 sol = solve_ivp(dCdt_Rdt, t_span, Y0, t_eval=t_eval)
     
-# Compute CUE at each time step
-CUE = np.zeros((N, len(sol.t)))
-for i, t in enumerate(sol.t):
-    C = sol.y[:N, i]  
-    R = sol.y[N:, i]  
-    total_uptake = u @ (R0-R)  
-    net_uptake = total_uptake * (1 - λ) - m  
-    CUE[:, i] = net_uptake / total_uptake  
+# CUE
+CUE = np.zeros(N)
+total_uptake = np.sum(u * R0, axis=1)  # (N × M) @ (M,) -> (N,)
+net_uptake = np.sum(u * R0 *(1-lambda_alpha), axis=1)-m # Adjusted for leakage and metabolism
+CUE = net_uptake/total_uptake
+print(f"Carbon Use Efficiency (CUE): {CUE.tolist()}")
 
-# Final CUE
-final_CUE = CUE[:, -1]
 u_sum = np.sum(u, axis=1)  # Mean uptake per consumer
 
 
@@ -112,7 +108,7 @@ def plot_regression(x, y, xlabel, ylabel, title):
     plt.legend()
     plt.show()
 plot_regression(
-    u_sum, final_CUE,
+    u_sum, CUE,
     xlabel="Sum of Resource uptake type",
     ylabel="Final CUE",
     title="Linear Regression of Final CUE vs. Resource uptake type")

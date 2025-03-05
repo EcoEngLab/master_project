@@ -1,9 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.stats as stats
 from scipy.integrate import solve_ivp
+import seaborn as sns
 import sys
 import os
-
 # Manually add the directory where param_3D.py is located
 sys.path.append(os.path.expanduser("~/Documents/MiCRM/code"))
 import param_3D
@@ -230,7 +231,7 @@ print(f"Community-level Carbon Use Efficiency (CUE): {CUE_community:.4f}")
 C_values = sol.y[:N, :]
 R_values = sol.y[N:, :]
 
-# select ten time points
+# select fifty time points
 time_indices = np.linspace(0, len(sol.t) - 1, 50, dtype=int)
 C_selected = C_values[:, time_indices]
 R_selected = R_values[:, time_indices]
@@ -276,3 +277,42 @@ plt.title('Instataneous Community CUE Over Time')
 plt.legend()
 plt.grid()
 plt.show()
+
+# Distribution of species CUE
+def identify_best_distribution(data, distributions=None):
+    if distributions is None:
+        distributions = ['norm', 'lognorm', 'gamma', 'expon', 'beta']
+    
+    best_fit = {}
+    for dist in distributions:
+        try:
+            # 拟合分布参数
+            params = getattr(stats, dist).fit(data)
+            
+            # 进行 KS 检验
+            ks_stat, p_value = stats.kstest(data, dist, args=params)
+            best_fit[dist] = (ks_stat, p_value)
+        except Exception as e:
+            print(f"Error fitting {dist}: {e}")
+            continue
+    
+    # 按 p 值排序（p 值越大表示拟合越好）
+    best_fit_sorted = sorted(best_fit.items(), key=lambda x: x[1][1], reverse=True)
+    best_distribution = best_fit_sorted[0][0]
+    best_p_value = best_fit_sorted[0][1][1]
+    
+    return best_distribution, best_p_value
+
+
+# 画出数据分布
+plt.figure(figsize=(8, 5))
+sns.histplot(CUE, bins=20, kde=True, edgecolor='black', alpha=0.7)
+plt.xlabel("Species CUE")
+plt.ylabel("Frequency")
+plt.title("Distribution of Species Carbon Use Efficiency (CUE)")
+plt.grid(True)
+plt.show()
+
+# 识别最佳拟合分布
+best_dist, best_p = identify_best_distribution(CUE)
+print(f"Best fitting distribution: {best_dist} (p-value = {best_p:.4f})")

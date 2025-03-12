@@ -131,57 +131,57 @@ plt.savefig("results/dynamics_of_consumers_resources.png", dpi=300, bbox_inches=
 plt.show()
 
 # Create an interactive 3D scatter plot
-import plotly.graph_objects as go
-fig = go.Figure(data=[go.Scatter3d(
-    x=u_mean,
-    y=u_variance,
-    z=final_CUE,
-    mode='markers',
-    marker=dict(
-        size=5,
-        color=final_CUE,  # Color mapped to CUE values
-        colorscale='viridis',
-        opacity=0.8
-    )
-)])
+#import plotly.graph_objects as go
+#fig = go.Figure(data=[go.Scatter3d(
+#    x=u_mean,
+#    y=u_variance,
+#    z=final_CUE,
+#    mode='markers',
+#    marker=dict(
+#        size=5,
+#        color=final_CUE,  # Color mapped to CUE values
+#        colorscale='viridis',
+#        opacity=0.8
+#    )
+#)])
 
 # Configure axis labels and title
-fig.update_layout(
-    scene=dict(
-        xaxis_title="Uptake Mean",
-        yaxis_title="Uptake Variance",
-        zaxis_title="CUE"
-    ),
-    title="3D Interactive Scatter Plot of CUE vs. Uptake Mean & Variance"
-)
+#fig.update_layout(
+#    scene=dict(
+#        xaxis_title="Uptake Mean",
+#        yaxis_title="Uptake Variance",
+#        zaxis_title="CUE"
+#    ),
+#    title="3D Interactive Scatter Plot of CUE vs. Uptake Mean & Variance"
+#)
 
 # Save the plot as an HTML file
-fig.write_html("results/CUE_uptake.html")
+#fig.write_html("results/CUE_uptake.html")
 
 # Show the interactive plot
-fig.show()
+#fig.show()
 # linear regression
-from scipy.stats import linregress
-def plot_regression(x, y, xlabel, ylabel, title):
-    plt.figure(figsize=(7, 5))
-    plt.scatter(x, y, label='Data points', color='b')
-    slope, intercept, r_value, p_value, std_err = linregress(x, y)
-    x_fit = np.linspace(min(x), max(x), 100)
-    y_fit = slope * x_fit + intercept
-    
-    plt.plot(x_fit, y_fit, color='r', linestyle='dashed', label=f'Fit: y={slope:.2f}x+{intercept:.2f}, R²={r_value**2:.2f}')
-    
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.title(title)
-    plt.legend()
-    plt.show()
-plot_regression(
-    u_mean, final_CUE,
-    xlabel="Uptake Mean",
-    ylabel="Final CUE",
-    title="Linear Regression of Final CUE vs. Uptake Mean"
-)
+#from scipy.stats import linregress
+#def plot_regression(x, y, xlabel, ylabel, title):
+#    plt.figure(figsize=(7, 5))
+#    plt.scatter(x, y, label='Data points', color='b')
+#    slope, intercept, r_value, p_value, std_err = linregress(x, y)
+#    x_fit = np.linspace(min(x), max(x), 100)
+#    y_fit = slope * x_fit + intercept
+#    
+#    plt.plot(x_fit, y_fit, color='r', linestyle='dashed', label=f'Fit: y={slope:.2f}x+{intercept:.2f}, R²={r_value**2:.2f}')
+#    
+#    plt.xlabel(xlabel)
+#    plt.ylabel(ylabel)
+#    plt.title(title)
+#    plt.legend()
+#    plt.show()
+#plot_regression(
+#    u_mean, final_CUE,
+#    xlabel="Uptake Mean",
+#    ylabel="Final CUE",
+#    title="Linear Regression of Final CUE vs. Uptake Mean"
+#)
 # Use R equilibrium as system equilibrium
 # find equilibrium state
 # Set the equilibrium threshold
@@ -227,7 +227,7 @@ biomass_growth = np.sum(C_steady) - np.sum(C0)
 CUE_community = biomass_growth/total_resource_consumed
 print(f"Community-level Carbon Use Efficiency (CUE): {CUE_community:.4f}")
 
-## cumulative community CUE
+# integral method of community CUE
 C_values = sol.y[:N, :]
 R_values = sol.y[N:, :]
 
@@ -235,49 +235,52 @@ R_values = sol.y[N:, :]
 time_indices = np.linspace(0, len(sol.t) - 1, 50, dtype=int)
 C_selected = C_values[:, time_indices]
 R_selected = R_values[:, time_indices]
-
-# calculate community cue
-dR = R_selected.sum(axis=0) - R0.sum() + sol.t[time_indices] * 12
-dR = dR[1:] 
-dC = C_selected.sum(axis=0) - C0.sum()
-dC = dC[1:] 
-COMMUNITYcue = dC/dR
+# cumulative community CUE
+#dR = R_selected.sum(axis=0) - R0.sum() + sol.t[time_indices] * 12
+#dR = dR[1:] 
+#dC = C_selected.sum(axis=0) - C0.sum()
+#dC = dC[1:] 
+# calculate community level CUE
+#community_cue = dC/dR
 # print output
-for i, t_idx in enumerate(time_indices[1:]):
-    print(f"Time: {sol.t[t_idx]:.2f}, COMMUNITY CUE: {COMMUNITYcue[i]:.4f}")
+#for i, t_idx in enumerate(time_indices[1:]):
+#    print(f"Time: {sol.t[t_idx]:.2f}, community CUE: {community_cue[i]:.4f}")
 
 # visualization
-plt.figure(figsize=(8, 5))
-plt.plot(sol.t[time_indices[1:]], COMMUNITYcue, marker='o', linestyle='-', label='COMMUNITY CUE')
-plt.xlabel('Time')
-plt.ylabel('COMMUNITY CUE')
-plt.title('Cumulative Community CUE Over Time')
-plt.legend()
-plt.grid()
-plt.show()
+#plt.figure(figsize=(8, 5))
+#plt.plot(sol.t[time_indices[1:]], community_cue, marker='o', linestyle='-', label='community CUE')
+#plt.xlabel('Time')
+#plt.ylabel('community CUE')
+#plt.title('Cumulative Community CUE Over Time')
+#plt.legend()
+#plt.grid()
+#plt.show()
 
 
 # instantaneous 
-# calculate the instataneous community cue between adjacent time points
+# calculate the instataneous community CUE between adjacent time points
 dR2 = (R_selected[:-1].sum(axis=0) - R_selected[0:].sum(axis=0)) 
 dR2 = dR2[1:] + 12 * (sol.t[time_indices[1:]] - sol.t[time_indices[:-1]])
 dC2 = C_selected[0:].sum(axis=0) - C_selected[:-1].sum(axis=0)
 dC2 = dC2 [1:] 
-COMMUNITYcue2 = dC2 / dR2
+community_cue2 = dC2 / dR2
 # print output
 for i, t_idx in enumerate(time_indices[1:]):
-    print(f"Time: {sol.t[t_idx]:.2f}, COMMUNITY CUE: {COMMUNITYcue2[i]:.4f}")
+    print(f"Time: {sol.t[t_idx]:.2f}, community CUE: {community_cue2[i]:.4f}")
 
 # visualization
 plt.figure(figsize=(8, 5))
-plt.plot(sol.t[time_indices[1:]], COMMUNITYcue2, marker='o', linestyle='-', label='COMMUNITY CUE')
+plt.plot(sol.t[time_indices[1:]], community_cue2, marker='o', linestyle='-', label='community CUE')
 plt.xlabel('Time')
-plt.ylabel('COMMUNITY CUE')
+plt.ylabel('community CUE')
 plt.title('Instataneous Community CUE Over Time')
 plt.legend()
 plt.grid()
 plt.show()
 
+# Integral
+total_integral = np.trapz(community_cue2, sol.t[time_indices[1:]])
+print(f"Total numerical integral of community CUE: {total_integral:.4f}")
 # Distribution of species CUE
 def identify_best_distribution(data, distributions=None):
     if distributions is None:
@@ -286,17 +289,13 @@ def identify_best_distribution(data, distributions=None):
     best_fit = {}
     for dist in distributions:
         try:
-            # 拟合分布参数
             params = getattr(stats, dist).fit(data)
-            
-            # 进行 KS 检验
             ks_stat, p_value = stats.kstest(data, dist, args=params)
             best_fit[dist] = (ks_stat, p_value)
         except Exception as e:
             print(f"Error fitting {dist}: {e}")
             continue
     
-    # 按 p 值排序（p 值越大表示拟合越好）
     best_fit_sorted = sorted(best_fit.items(), key=lambda x: x[1][1], reverse=True)
     best_distribution = best_fit_sorted[0][0]
     best_p_value = best_fit_sorted[0][1][1]
@@ -304,7 +303,7 @@ def identify_best_distribution(data, distributions=None):
     return best_distribution, best_p_value
 
 
-# 画出数据分布
+
 plt.figure(figsize=(8, 5))
 sns.histplot(CUE, bins=20, kde=True, edgecolor='black', alpha=0.7)
 plt.xlabel("Species CUE")
@@ -313,6 +312,6 @@ plt.title("Distribution of Species Carbon Use Efficiency (CUE)")
 plt.grid(True)
 plt.show()
 
-# 识别最佳拟合分布
+
 best_dist, best_p = identify_best_distribution(CUE)
 print(f"Best fitting distribution: {best_dist} (p-value = {best_p:.4f})")

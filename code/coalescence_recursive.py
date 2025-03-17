@@ -10,7 +10,7 @@ from scipy.stats import pearsonr
 import pandas as pd
 
 # Parameters
-num_simulations = 20  # Number of repeated simulations with different random seeds
+num_simulations = 30  # Number of repeated simulations with different random seeds
 N_pool = 1000  # Number of species in the pool
 M = 5  # Number of resources
 λ = 0.3  # Total leakage rate
@@ -20,7 +20,6 @@ N1, N2 = 20, 20  # Number of species in Community 1 and 2
 
 # Storage for results
 results = []
-C_final_list = []
 # Loop over multiple simulations with different random seeds
 for seed in range(num_simulations):
     np.random.seed(seed)  # Change random seed
@@ -38,9 +37,9 @@ for seed in range(num_simulations):
     l1, l2 = l_pool[indices1, :, :], l_pool[indices2, :, :]
 
     # Define parameters
-    m1, m2 = np.full(N1, 0.3), np.full(N2, 0.35)
-    rho1, rho2 = np.full(M, 0.4), np.full(M, 0.7)
-    omega1, omega2 = np.full(M, 0.5), np.full(M, 0.5)
+    m1, m2 = np.random. uniform(0.2, 0.3,N1), np.random. uniform(0.2, 0.3,N2)
+    rho1, rho2 = np.full(M, 0.4), np.full(M, 0.4)
+    omega1, omega2 = np.full(M, 0.3), np.full(M, 0.3)
 
     # Function for ODE system
     def dCdt_Rdt(t, y, u, l, N, M, m, rho, omega):
@@ -66,6 +65,8 @@ for seed in range(num_simulations):
 
     # Merge into Community 3
     N3, m3 = N1 + N2, np.concatenate([m1, m2])
+    rho3 = np.full(M, 0.4)  
+    omega3 = np.full(M, 0.3) 
     uu, ll = np.vstack([u1, u2]), np.vstack([l1, l2])
     C0_3 = np.concatenate([sol1.y[:N1, -1], sol2.y[:N2, -1]])  # Final abundance as initial for coalescence
     R0_3 = sol1.y[N1:, -1] + sol2.y[N2:, -1]
@@ -76,9 +77,9 @@ for seed in range(num_simulations):
     community_CUE1, species_CUE1 = CUE.compute_community_CUE2(sol1, N1, u1, R0, l1, m1)
     community_CUE2, species_CUE2 = CUE.compute_community_CUE2(sol2, N2, u2, R0, l2, m2)
     community_CUE3, species_CUE3 = CUE.compute_community_CUE2(sol3, N3, uu, R0_3, ll, m3)
-    for sol in sol_list:
-        C_final = sol.y[:, -1]
+
     # Compute dominance in Community 3
+    C_final = sol3.y[:, -1]
     total_community1, total_community2 = np.sum(C_final[:N_list[0]]), np.sum(C_final[N_list[0]:])
     dominant = "Community 1" if total_community1 > total_community2 else "Community 2"
 
@@ -90,7 +91,7 @@ for seed in range(num_simulations):
         "Community CUE 3": community_CUE3,
         "Total Abundance 1": total_community1,
         "Total Abundance 2": total_community2,
-        "Dominant Community": dominant
+        "Dominant Community": dominant,
     })
 
 # Convert results to DataFrame
@@ -106,16 +107,34 @@ from sklearn.linear_model import LinearRegression
 df_c1 = df_results[["Community CUE 1", "Dominance Community 1"]].rename(
     columns={"Community CUE 1": "CUE", "Dominance Community 1": "Dominance"}
 )
+df_c1["Group"] = "Community 1"
 
 # Merge "Community CUE 2" and "Dominance Community 2" into a unified format
 df_c2 = df_results[["Community CUE 2", "Dominance Community 2"]].rename(
     columns={"Community CUE 2": "CUE", "Dominance Community 2": "Dominance"}
 )
-
+df_c2["Group"] = "Community 2"
 # Concatenate both DataFrames
 df_combined = pd.concat([df_c1, df_c2], ignore_index=True)
+df_combined.to_csv("data/df_combined.csv", index=False)
 
-X = df_combined["CUE"].values.reshape(-1, 1)
-y = df_combined["Dominance"].values
-# Save df_combined to a CSV file without the index
-df_combined.to_csv("results/df_combined.csv", index=False)
+# fit model
+import statsmodels.api as sm
+X = sm.add_constant(df_combined["CUE"])
+y = df_combined["Dominance"]
+
+
+model = sm.Logit(y, X).fit()
+cue_seq = np.linspace(df_combined["CUE"].min(), df_combined["CUE"].max(), 100)
+X_pred = sm.add_constant(pd.DataFrame({"CUE": cue_seq}))
+predicted = model.predict(X_pred)
+colors = ["blue" if g =="Community 1" else "darkred" for g in df_combined["Group"]]
+plt.scatter(df_combined["CUE"], df_combined["Dominance"], c = colors, alpha = 0.6)
+plt.scatter([], [], color = "blue", alpha = 0.6, label = "Community 1")
+plt.scatter([], [], color = "darkred", alpha = 0.6, label = "Community 2")
+plt.plot(cue_seq, predicted, color = "black", linewidth = 2, label = "Logistic Regression")
+plt.xlabel("CUE vALUE")
+plt.ylabel("Probability of Dominance(1 = Dominant)")
+plt.title("Logistic Regression")
+plt.legend()
+plt.show()

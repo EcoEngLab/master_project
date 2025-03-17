@@ -102,5 +102,5 @@ def compute_community_CUE2(sol, N, u, R0, l, m):
 
     # Compute community CUE as the weighted average of species CUE
     community_CUE = np.sum(C_values * species_CUE) / np.sum(C_values)
-    
+
     return community_CUE, species_CUE

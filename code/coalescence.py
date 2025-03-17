@@ -4,6 +4,7 @@ import sys
 sys.path.append(os.path.expanduser("~/Documents/MiCRM/code"))
 import param
 import CUE
+import pandas as pd
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 # Parameters
@@ -26,12 +27,12 @@ omega1 = np.full(M, 0.5)  # Decay rate of resource for Community 1
 
 # Parameters for Community 2
 m2 = np.full(N2, 0.35)     # Maintenance cost rate for Community 2
-rho2 = np.full(M, 0.7)    # Resource input rate for Community 2
+rho2 = np.full(M, 0.5)    # Resource input rate for Community 2
 omega2 = np.full(M, 0.5)  # Decay rate of resource Community 2
 
 # Parameters for merged Community
 m3 = np.concatenate([m1, m2])  # Maintenance cost rate for Community 3
-rho3 = np.full(M, 0.5)         # Resource input rate for Community 3
+rho3 = np.full(M, 0.45)         # Resource input rate for Community 3
 omega3 = np.full(M, 0.5)       # Decay rate of resource for Community 3
 
 # Generate uptake matrix and leakage tensor for the species pool
@@ -125,72 +126,49 @@ for i in range(num_communities):
     plt.legend()
     plt.show()
 ###### visualization for the seperation between survival and extinction######
-species_CUE_list = []
-C_final_list = []
-survival_counts = []
-
+data_to_save = [] 
 for i in range(num_communities):
-    # Compute CUE for each community
+    C_final = np.array(sol_list[i].y[:, -1])  # shape: (num_species,)
+    
     community_CUE, species_CUE = CUE.compute_community_CUE2(
         sol_list[i], N_list[i], u_list[i], R0_list[i], l_list[i], m_list[i]
     )
-    species_CUE_list.append(species_CUE)
-    # Store final biomass values
-    C_final = sol_list[i].y[:, -1]
-    C_final_list.append(C_final)
+    species_CUE = np.array(species_CUE, dtype=float)  # shape: (num_species_filtered,)
 
-    # Count richness using the correct C_final reference
-    richness = sum(1 for j in range(len(C_final)) if C_final[j] >= 0.1)
-    survival_counts.append(richness)
-
-    # Convert to NumPy array for calculations
-    species_CUE = np.array(species_CUE, dtype=float)
-
-    # Compute statistics
-    species_var = np.var(species_CUE, ddof=1)  # Variance (unbiased estimator)
-    # Create scatter plot
-    plt.figure(figsize=(8, 5))
-    C_final = C_final_list[i]
-    species_CUE = species_CUE_list[i]
-
+    surviving_CUE = []
+    extinct_CUE = []
     # Separate surviving and extinct species based on CUE threshold
     surviving_CUE = [species_CUE[j] for j in range(len(species_CUE)) if C_final[j] >= 0.1]
     extinct_CUE = [species_CUE[j] for j in range(len(species_CUE)) if C_final[j] < 0.1]
+    surviving_species_count = len(surviving_CUE)
 
-    # X-axis positions (community index)
-    x_surviving = [i + 1] * len(surviving_CUE)
-    x_extinct = [i + 1] * len(extinct_CUE)
 
-    # Dominance
-    total_community1 = np.sum(C_final[:N_list[0]])
-    total_community2 = np.sum(C_final[N_list[0]:])
+    mean_surviving_CUE = np.mean(surviving_CUE) if surviving_CUE else np.nan
+    mean_extinct_CUE = np.mean(extinct_CUE) if extinct_CUE else np.nan
 
-    if total_community1 > total_community2:
-        dominant = "Community 1"
-    else:
-        dominant = "Community 2"
-    # Print results
-    print(f"\nCommunity {i+1}:")
-    # Print survival counts
-    print(f"{survival_counts[i]} species richness")
-    print(f"Average community {i+1} CUE: {community_CUE:.4f}")
-    print(f"Species {i+1} CUE: {[f'{cue:.4f}' for cue in species_CUE]}")
-    print(f"  Variance: {species_var:.4f}")
+    print(f"Community {i+1}:")
+    print(f"  Surviving species count: {surviving_species_count}")
+    print(f"  Mean CUE (Surviving): {mean_surviving_CUE:.4f}")
+    print(f"  Mean CUE (Extinct):   {mean_extinct_CUE:.4f}")
     print("-" * 50)
-    # Plot scatter points
-    plt.scatter(x_surviving, surviving_CUE, color='green', label="Survival" if i == 0 else "")
-    plt.scatter(x_extinct, extinct_CUE, color='gray', label="Extinction" if i == 0 else "")
 
-# Set labels and title
-plt.xticks(range(1, num_communities + 1), [f"Community {i+1}" for i in range(num_communities)])
-plt.xlabel("Community")
-plt.ylabel("CUE")
-plt.title("CUE Distribution Across Communities")
 
-# Add legend
-plt.legend()
-plt.show()
+    for val in surviving_CUE:
+        data_to_save.append({
+            "Community": i + 1,
+            "Status": "Survival",
+            "CUE": val
+        })
+    for val in extinct_CUE:
+        data_to_save.append({
+            "Community": i + 1,
+            "Status": "Extinction",
+            "CUE": val
+        })
 
+# After the loop: create a DataFrame and save to CSV
+df_out = pd.DataFrame(data_to_save)
+df_out.to_csv("data/CUE_distribution.csv", index=False)
 ############# compute aij ################
 def compute_aij(R, u, l, N, M):
     dR_dC = np.zeros((M, N))
@@ -198,7 +176,7 @@ def compute_aij(R, u, l, N, M):
     for alpha in range(M):
         for j in range(N):
             dR_dC[alpha, j] = - R[alpha] * u[j, alpha] + np.sum(R * u[j, :] * l[j, :, alpha])
-    aij = np.dot(uu* (1 - λ), dR_dC)
+    aij = np.dot(u* (1 - λ), dR_dC)
     return aij
 
 different_aij = []
@@ -233,3 +211,4 @@ plt.ylabel("Total Numerical Integral of CUE")
 plt.title("Effect of R0_3 on Community CUE")
 plt.grid()
 plt.show()
+

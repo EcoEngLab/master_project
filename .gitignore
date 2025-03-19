@@ -5,6 +5,7 @@
 !code/
 !results/
 !data/
+community_coalescence.ipynb
 
 # Ignore cache and temporary folders inside the code directory
 code/__pycache__/

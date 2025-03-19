@@ -9,37 +9,56 @@ import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 import pandas as pd
 
-# Parameters
-num_simulations = 30  # Number of repeated simulations with different random seeds
-N_pool = 1000  # Number of species in the pool
-M = 5  # Number of resources
-λ = 0.3  # Total leakage rate
-N_modules = 4  # Number of modules
-s_ratio = 10.0  # Modularity parameter
-N1, N2 = 20, 20  # Number of species in Community 1 and 2
-
 # Storage for results
 results = []
-# Loop over multiple simulations with different random seeds
-for seed in range(num_simulations):
-    np.random.seed(seed)  # Change random seed
+# Load the seed list
+with open('seeds.txt', 'r') as f:
+    seeds = [int(line.strip()) for line in f]
+# Loop over the 50 seeds
+for seed in seeds:
+    np.random.seed(seed)
+    N_pool = 1000  # Species pool size
+    M_pool = 20     # Resource pool size
+    λ = 0.2        # Total leakage rate
+    N_modules = 5  # Number of modules
+    s_ratio = 10.0 # Modularity ratio
+    N1 = 10
+    M1 = 5
+    m1 = np.full(N1, 0.3)  # maintaining cost rate
+    N2 = 10
+    M2 = 5
+    m2 = np.full(N2, 0.2)
     # Generate uptake matrix and leakage tensor for the species pool
-    u_pool = param.modular_uptake(N_pool, M, N_modules, s_ratio)
-    l_pool = param.generate_l_tensor(N_pool, M, N_modules, s_ratio, λ)
+    u_pool = param.modular_uptake(N_pool, M_pool, N_modules, s_ratio)
+    l_pool = param.generate_l_tensor(N_pool, M_pool, N_modules, s_ratio, λ)
+    # Set rho and omega for the resource pool
+    rho_pool = np.full(M_pool, 0.6)
+    omega_pool = np.full(M_pool, 0.1)
+    # Community 1
+    species_indices1 = np.random.choice(N_pool, N1, replace=False)
+    resource_indices1 = np.random.choice(M_pool, M1, replace=False)
+    u1 = u_pool[np.ix_(species_indices1, resource_indices1)]
+    l1 = l_pool[np.ix_(species_indices1, resource_indices1, resource_indices1)]
+    lambda_alpha1 = np.full(M1, λ)
+    rho1 = rho_pool[resource_indices1]
+    omega1 = omega_pool[resource_indices1]
+    # Community 2
+    if M1 > M2:
+        resource_indices2 = np.random.choice(resource_indices1, M2, replace=False)
+    elif M1 < M2:
+        remaining_resources = np.setdiff1d(np.arange(M_pool), resource_indices1)
+        additional_resources = np.random.choice(remaining_resources, M2 - M1, replace=False)
+        resource_indices2 = np.concatenate([resource_indices1, additional_resources])
+    else:
+        resource_indices2 = resource_indices1.copy()
+    remaining_species = np.setdiff1d(np.arange(N_pool), species_indices1)
+    species_indices2 = np.random.choice(remaining_species, N2, replace=False)
+    u2 = u_pool[np.ix_(species_indices2, resource_indices2)]
+    l2 = l_pool[np.ix_(species_indices2, resource_indices2, resource_indices2)]
+    lambda_alpha2 = np.full(M2, λ)
+    rho2 = rho_pool[resource_indices2]
+    omega2 = omega_pool[resource_indices2]
 
-    # Select indices for Community 1 and Community 2
-    indices1 = np.random.choice(N_pool, N1, replace=False)
-    remaining_indices = np.setdiff1d(np.arange(N_pool), indices1)
-    indices2 = np.random.choice(remaining_indices, N2, replace=False)
-
-    # Extract uptake and leakage matrices for each community
-    u1, u2 = u_pool[indices1, :], u_pool[indices2, :]
-    l1, l2 = l_pool[indices1, :, :], l_pool[indices2, :, :]
-
-    # Define parameters
-    m1, m2 = np.random. uniform(0.2, 0.3,N1), np.random. uniform(0.2, 0.3,N2)
-    rho1, rho2 = np.full(M, 0.4), np.full(M, 0.4)
-    omega1, omega2 = np.full(M, 0.3), np.full(M, 0.3)
 
     # Function for ODE system
     def dCdt_Rdt(t, y, u, l, N, M, m, rho, omega):
@@ -57,20 +76,30 @@ for seed in range(num_simulations):
         return np.concatenate([dCdt, dRdt])
 
     # Solve ODE for each community
-    t_span, t_eval = (0, 50), np.linspace(0, 50, 300)
-    C0, R0 = np.full(N1, 0.01), np.full(M, 1)
+    t_span, t_eval = (0, 500), np.linspace(0, 500, 300)
+    C0, R0 = np.full(N1, 0.01), np.full(M1, 1)
 
-    sol1 = solve_ivp(dCdt_Rdt, t_span, np.concatenate([C0, R0]), t_eval=t_eval, args=(u1, l1, N1, M, m1, rho1, omega1))
-    sol2 = solve_ivp(dCdt_Rdt, t_span, np.concatenate([C0, R0]), t_eval=t_eval, args=(u2, l2, N2, M, m2, rho2, omega2))
+    sol1 = solve_ivp(dCdt_Rdt, t_span, np.concatenate([C0, R0]), t_eval=t_eval, args=(u1, l1, N1, M1, m1, rho1, omega1))
+    sol2 = solve_ivp(dCdt_Rdt, t_span, np.concatenate([C0, R0]), t_eval=t_eval, args=(u2, l2, N2, M2, m2, rho2, omega2))
 
+    
     # Merge into Community 3
-    N3, m3 = N1 + N2, np.concatenate([m1, m2])
-    rho3 = np.full(M, 0.4)  
-    omega3 = np.full(M, 0.3) 
-    uu, ll = np.vstack([u1, u2]), np.vstack([l1, l2])
-    C0_3 = np.concatenate([sol1.y[:N1, -1], sol2.y[:N2, -1]])  # Final abundance as initial for coalescence
-    R0_3 = sol1.y[N1:, -1] + sol2.y[N2:, -1]
-    sol3 = solve_ivp(dCdt_Rdt, t_span, np.concatenate([C0_3, R0_3]), t_eval=t_eval, args=(uu, ll, N3, M, m3, np.full(M, 0.5), np.full(M, 0.5)))
+    species_indices3 = np.concatenate([species_indices1, species_indices2])
+    resource_indices3 = resource_indices1 if M1 >= M2 else resource_indices2
+    uu = u_pool[np.ix_(species_indices3, resource_indices3)]
+    ll = l_pool[np.ix_(species_indices3, resource_indices3, resource_indices3)]
+    m3 = np.concatenate([m1, m2])
+    lambda_alpha3 = np.full(len(resource_indices3), λ)
+    rho3 = rho_pool[resource_indices3]
+    omega3 = omega_pool[resource_indices3]
+    N3 = N1 + N2
+    M3 = len(resource_indices3)
+
+    C0_3 = np.concatenate([sol1.y[:N1, -1], sol2.y[:N2, -1]])
+    R0_3 = sol1.y[N1:, -1]  + sol2.y[N2:, -1]
+    Y0_3 = np.concatenate([C0_3, R0_3])
+
+    sol3 = solve_ivp(dCdt_Rdt, t_span, np.concatenate([C0_3, R0_3]), t_eval=t_eval, args=(uu, ll, N3, M3, m3, np.full(M3, 0.5), np.full(M3, 0.5)))
     sol_list = [sol1, sol2, sol3]
     N_list = [N1, N2, N3]
     # Compute Community CUE for each community
@@ -96,6 +125,7 @@ for seed in range(num_simulations):
 
 # Convert results to DataFrame
 df_results = pd.DataFrame(results)
+df_results.to_csv("data/df_results.csv", index=False)
 
 # Assign Dominance values
 df_results["Dominance Community 1"] = df_results["Dominant Community"].apply(lambda x: 1 if x == "Community 1" else 0)

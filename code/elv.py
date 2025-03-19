@@ -5,6 +5,7 @@ from scipy.optimize import root
 import param
 import CUE
 # Parameter settings
+np.random.seed(37)
 N_pool = 1000  # Species pool size
 M_pool = 20     # Resource pool size
 λ = 0.2        # Total leakage rate

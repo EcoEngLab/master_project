@@ -7,9 +7,14 @@ import sys
 sys.path.append(os.path.expanduser("~/Documents/MiCRM/code"))
 import param
 import CUE
-num_simulations = 10 
+import pandas as pd
+
 results = []
-for seed in range(num_simulations):
+with open('seeds.txt', 'r') as f:
+    seeds = [int(line.strip()) for line in f]
+
+# Loop over the 50 seeds
+for seed in seeds:
     np.random.seed(seed)
     N_pool = 1000  # Species pool size
     M_pool = 20     # Resource pool size
@@ -18,13 +23,13 @@ for seed in range(num_simulations):
     s_ratio = 10.0 # Modularity ratio
     N1 = 10
     M1 = 5
-    m1 = np.full(N1, 0.3)  # maintaining cost rate
+    m1 = np.random.uniform(0.2, 0.3, N1)  # maintaining cost rate
     N2 = 10
     M2 = 5
-    m2 = np.full(N2, 0.2)
+    m2 = np.random.uniform(0.2, 0.3, N2)
     # Generate uptake matrix and leakage tensor for the species pool
     u_pool = param.modular_uptake(N_pool, M_pool, N_modules, s_ratio)
-    l_pool = param.generate_l_tensor(N_pool, M_pool, N_modules, s_ratio, λ)
+    l_pool = param.generate_l_tensor(N_pool, M_pool, N_modules, s_ratio, λ)                                                                                                                                                           
     # Set rho and omega for the resource pool
     rho_pool = np.full(M_pool, 0.6)
     omega_pool = np.full(M_pool, 0.1)
@@ -66,6 +71,7 @@ for seed in range(num_simulations):
     y_guess1 = np.concatenate([C_guess1, R_guess1])
     sol_steady1 = root(lambda y: steady_state_eq(y, N1, M1, u1, l1, m1, lambda_alpha1, rho1, omega1), y_guess1)
     C_hat1 = sol_steady1.x[:N1]
+    C_hat1 = np.where(C_hat1 < 0, 0, C_hat1)
     R_hat1 = sol_steady1.x[N1:]
     # D for Community 1
     D1 = np.diag(omega1 + np.sum(C_hat1[:, np.newaxis] * u1, axis=0))
@@ -92,6 +98,7 @@ for seed in range(num_simulations):
     y_guess2 = np.concatenate([C_guess2, R_guess2])
     sol_steady2 = root(lambda y: steady_state_eq(y, N2, M2, u2, l2, m2, lambda_alpha2, rho2, omega2), y_guess2)
     C_hat2 = sol_steady2.x[:N2]
+    C_hat2 = np.where(C_hat2 < 0, 0, C_hat2)
     R_hat2 = sol_steady2.x[N2:]
     # D for Community 2
     D2 = np.diag(omega2 + np.sum(C_hat2[:, np.newaxis] * u2, axis=0))
@@ -126,8 +133,8 @@ for seed in range(num_simulations):
     C0_3[:N1] = sol1.y[:, -1]
     C0_3[N1:] = sol2.y[:, -1]
     # Solve for the steady state
-    C_guess3 = np.full(N3, 0.1)
-    R_guess3 = np.full(M3, 1.0)
+    C_guess3 = np.concatenate([sol1.y[:N1, -1], sol2.y[:N2, -1]])  
+    R_guess3 = R_hat1 + R_hat2
     y_guess3 = np.concatenate([C_guess3, R_guess3])
     sol_steady3 = root(lambda y: steady_state_eq(y, N3, M3, u3, l3, m3, lambda_alpha3, rho3, omega3), y_guess3)
     if not sol_steady3.success:
@@ -190,12 +197,14 @@ for seed in range(num_simulations):
         "Length r3": length_r3,
         "Community CUE 1": community_CUE1,
         "Community CUE 2": community_CUE2,
-        "Community CUE 3": community_CUE3
+        "Community CUE 3": community_CUE3,
+        "C_final": sol3.y[:, -1]
     })
+
 df_out = pd.DataFrame(results)
 df_out.to_csv("data/growth rate length vs. CUE.csv", index=False)
 
-import pandas as pd
+
 df_results = pd.DataFrame(results)
 
 

@@ -1,3 +1,23 @@
-# 忽略 micrm/ 目录及其所有内容
-micrm/
+# Ignore everything by default
+*
 
+# But keep the following directories
+!code/
+!results/
+!data/
+
+# Ignore cache and temporary folders inside the code directory
+code/__pycache__/
+code/.ipynb_checkpoints/
+
+# Also ignore global cache and temporary files
+__pycache__/
+.ipynb_checkpoints/
+.vscode/
+*.pyc
+*.log
+*.tmp
+.DS_Store
+
+# Ignore Jupyter checkpoint files anywhere
+**/.ipynb_checkpoints/

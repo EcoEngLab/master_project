@@ -24,7 +24,7 @@ for seed in seeds:
     s_ratio = 10.0 # Modularity ratio
     N1 = 10
     M1 = 5
-    m1 = np.full(N1, 0.3)  # maintaining cost rate
+    m1 = np.full(N1, 0.2)  # maintaining cost rate
     N2 = 10
     M2 = 5
     m2 = np.full(N2, 0.2)
@@ -106,65 +106,85 @@ for seed in seeds:
     community_CUE1, species_CUE1 = CUE.compute_community_CUE2(sol1, N1, u1, R0, l1, m1)
     community_CUE2, species_CUE2 = CUE.compute_community_CUE2(sol2, N2, u2, R0, l2, m2)
     community_CUE3, species_CUE3 = CUE.compute_community_CUE2(sol3, N3, uu, R0_3, ll, m3)
+    # 
+    # Calculate relative abundance
+    C_final1 = sol1.y[:N1, -1] 
+    C_final2 = sol2.y[:N2, -1] 
+    C_final3 = sol3.y[:N3, -1] 
 
-    # Compute dominance in Community 3
-    C_final = sol3.y[:, -1]
-    total_community1, total_community2 = np.sum(C_final[:N_list[0]]), np.sum(C_final[N_list[0]:])
-    dominant = "Community 1" if total_community1 > total_community2 else "Community 2"
+    rel_abundance1 = C_final1 / np.sum(C_final1)
+    rel_abundance2 = C_final2 / np.sum(C_final2)
+    rel_abundance3 = C_final3 / np.sum(C_final3)
+    result_entry = {
+            "Seed": seed,
+            "Community CUE 1": community_CUE1,
+            "Community CUE 2": community_CUE2,
+            "Community CUE 3": community_CUE3,
+            # "Total Abundance 1": total_community1,
+            # "Total Abundance 2": total_community2,
+            # "Dominant Community": dominant,
+        }
+
+    for i, (val, cue_val) in enumerate(zip(rel_abundance1, species_CUE1)):
+        result_entry[f"RelAbun_Comm1_Sp{i+1}"] = val
+        result_entry[f"CUE_Comm1_Sp{i+1}"] = cue_val
+
+    for i, (val, cue_val) in enumerate(zip(rel_abundance2, species_CUE2)):
+        result_entry[f"RelAbun_Comm2_Sp{i+1}"] = val
+        result_entry[f"CUE_Comm2_Sp{i+1}"] = cue_val
+
+    for i, (val, cue_val) in enumerate(zip(rel_abundance3, species_CUE3)):
+        result_entry[f"RelAbun_Comm3_Sp{i+1}"] = val
+        result_entry[f"CUE_Comm3_Sp{i+1}"] = cue_val
+
+    # # Compute dominance in Community 3
+    # total_community1, total_community2 = np.sum(C_final3[:N_list[0]]), np.sum(C_final3[N_list[0]:])
+    # dominant = "Community 1" if total_community1 > total_community2 else "Community 2"
 
     # Store results
-    results.append({
-        "Seed": seed,
-        "Community CUE 1": community_CUE1,
-        "Community CUE 2": community_CUE2,
-        "Community CUE 3": community_CUE3,
-        "Total Abundance 1": total_community1,
-        "Total Abundance 2": total_community2,
-        "Dominant Community": dominant,
-    })
-
+    results.append(result_entry)
 # Convert results to DataFrame
 df_results = pd.DataFrame(results)
 df_results.to_csv("data/df_results.csv", index=False)
 
-# Assign Dominance values
-df_results["Dominance Community 1"] = df_results["Dominant Community"].apply(lambda x: 1 if x == "Community 1" else 0)
-df_results["Dominance Community 2"] = df_results["Dominant Community"].apply(lambda x: 1 if x == "Community 2" else 0)
+# # Assign Dominance values
+# df_results["Dominance Community 1"] = df_results["Dominant Community"].apply(lambda x: 1 if x == "Community 1" else 0)
+# df_results["Dominance Community 2"] = df_results["Dominant Community"].apply(lambda x: 1 if x == "Community 2" else 0)
 
-# Logistics regression and scatter plot for Community CUE vs. Dominance
-from sklearn.linear_model import LinearRegression
-# Merge df_results into a unified format
-df_c1 = df_results[["Community CUE 1", "Dominance Community 1"]].rename(
-    columns={"Community CUE 1": "CUE", "Dominance Community 1": "Dominance"}
-)
-df_c1["Group"] = "Community 1"
+# # Logistics regression and scatter plot for Community CUE vs. Dominance
+# from sklearn.linear_model import LinearRegression
+# # Merge df_results into a unified format
+# df_c1 = df_results[["Community CUE 1", "Dominance Community 1"]].rename(
+#     columns={"Community CUE 1": "CUE", "Dominance Community 1": "Dominance"}
+# )
+# df_c1["Group"] = "Community 1"
 
-# Merge "Community CUE 2" and "Dominance Community 2" into a unified format
-df_c2 = df_results[["Community CUE 2", "Dominance Community 2"]].rename(
-    columns={"Community CUE 2": "CUE", "Dominance Community 2": "Dominance"}
-)
-df_c2["Group"] = "Community 2"
-# Concatenate both DataFrames
-df_combined = pd.concat([df_c1, df_c2], ignore_index=True)
-df_combined.to_csv("data/df_combined.csv", index=False)
+# # Merge "Community CUE 2" and "Dominance Community 2" into a unified format
+# df_c2 = df_results[["Community CUE 2", "Dominance Community 2"]].rename(
+#     columns={"Community CUE 2": "CUE", "Dominance Community 2": "Dominance"}
+# )
+# df_c2["Group"] = "Community 2"
+# # Concatenate both DataFrames
+# df_combined = pd.concat([df_c1, df_c2], ignore_index=True)
+# df_combined.to_csv("data/df_combined.csv", index=False)
 
-# fit model
-import statsmodels.api as sm
-X = sm.add_constant(df_combined["CUE"])
-y = df_combined["Dominance"]
+# # fit model
+# import statsmodels.api as sm
+# X = sm.add_constant(df_combined["CUE"])
+# y = df_combined["Dominance"]
 
 
-model = sm.Logit(y, X).fit()
-cue_seq = np.linspace(df_combined["CUE"].min(), df_combined["CUE"].max(), 100)
-X_pred = sm.add_constant(pd.DataFrame({"CUE": cue_seq}))
-predicted = model.predict(X_pred)
-colors = ["blue" if g =="Community 1" else "darkred" for g in df_combined["Group"]]
-plt.scatter(df_combined["CUE"], df_combined["Dominance"], c = colors, alpha = 0.6)
-plt.scatter([], [], color = "blue", alpha = 0.6, label = "Community 1")
-plt.scatter([], [], color = "darkred", alpha = 0.6, label = "Community 2")
-plt.plot(cue_seq, predicted, color = "black", linewidth = 2, label = "Logistic Regression")
-plt.xlabel("CUE vALUE")
-plt.ylabel("Probability of Dominance(1 = Dominant)")
-plt.title("Logistic Regression")
-plt.legend()
-plt.show()
+# model = sm.Logit(y, X).fit()
+# cue_seq = np.linspace(df_combined["CUE"].min(), df_combined["CUE"].max(), 100)
+# X_pred = sm.add_constant(pd.DataFrame({"CUE": cue_seq}))
+# predicted = model.predict(X_pred)
+# colors = ["blue" if g =="Community 1" else "darkred" for g in df_combined["Group"]]
+# plt.scatter(df_combined["CUE"], df_combined["Dominance"], c = colors, alpha = 0.6)
+# plt.scatter([], [], color = "blue", alpha = 0.6, label = "Community 1")
+# plt.scatter([], [], color = "darkred", alpha = 0.6, label = "Community 2")
+# plt.plot(cue_seq, predicted, color = "black", linewidth = 2, label = "Logistic Regression")
+# plt.xlabel("CUE vALUE")
+# plt.ylabel("Probability of Dominance(1 = Dominant)")
+# plt.title("Logistic Regression")
+# plt.legend()
+# plt.show()

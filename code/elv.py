@@ -200,6 +200,8 @@ axes[2].grid(True)
 axes[2].legend(loc='upper right', fontsize='small', ncol=2)
 plt.tight_layout()
 plt.show()
+
+
 print("alpha1:", alpha1)
 print("alpha2:", alpha2)
 print("alpha3:", alpha3)

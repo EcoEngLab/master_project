@@ -17,7 +17,7 @@ N_modules = 5  # Number of modules
 s_ratio = 10.0 # Modularity ratio
 N1 = 10
 M1 = 5
-m1 = np.full(N1, 0.3)  # maintaining cost rate
+m1 = np.full(N1, 0.2)  # maintaining cost rate
 N2 = 10
 M2 = 5
 m2 = np.full(N2, 0.2)
@@ -102,18 +102,42 @@ omega3 = omega_pool[resource_indices3]
 N3 = N1 + N2
 M3 = len(resource_indices3)
 
-
-
-
-
-
-
-
 C0_3 = np.concatenate([ce1, ce2])
 R0_3 = re1 + re2
 Y0_3 = np.concatenate([C0_3, R0_3])
 sol3 = solve_ivp(dCdt_Rdt, t_span, Y0_3, t_eval=t_eval, args=(uu, ll, N3, M3, m3, rho3, omega3))
-
+#############################################
+# Plot biomass change over time
+fig, axes = plt.subplots(1, 3, figsize=(15, 5), sharey=True)
+# Plot for Community 1
+cmap1 = plt.get_cmap("Blues")
+for i, idx in enumerate(species_indices1):
+    axes[0].plot(sol1.t, sol1.y[i], color=cmap1((i + 1) / (N1 + 1)), label=f"c{idx}")
+axes[0].set_title('Community 1 Dynamics')
+axes[0].set_xlabel('Time')
+axes[0].set_ylabel('Consumer Abundance')
+axes[0].grid(True)
+axes[0].legend(loc='upper right', fontsize='small')
+# Plot for Community 2
+cmap2 = plt.get_cmap("Reds")
+for i, idx in enumerate(species_indices2):
+    axes[1].plot(sol2.t, sol2.y[i], color=cmap2((i + 1) / (N2 + 1)), label=f"c{idx}")
+axes[1].set_title('Community 2 Dynamics ')
+axes[1].set_xlabel('Time')
+axes[1].grid(True)
+axes[1].legend(loc='upper right', fontsize='small')
+# Plot for Community 3 (merged)
+for i, idx in enumerate(species_indices1):
+    axes[2].plot(sol3.t, sol3.y[i], color=cmap1((i + 1) / (N1 + 1)), label=f"c{idx}")
+for i, idx in enumerate(species_indices2):
+    axes[2].plot(sol3.t, sol3.y[N1 + i], color=cmap2((i + 1) / (N2 + 1)), label=f"c{idx}")
+axes[2].set_title('Coalescence Dynamics')
+axes[2].set_xlabel('Time')
+axes[2].grid(True)
+axes[2].legend(loc='upper right', fontsize='small', ncol=2)
+plt.tight_layout()
+plt.show()
+###### compare the community CUE between survival and extinction######
 sol_list = [sol1, sol2, sol3]  # List of community solutions
 N_list = [N1, N2, N3]  # Number of consumers for each community
 u_list = [u1, u2, uu]
@@ -122,29 +146,6 @@ l_list = [l1, l2, ll]
 m_list = [m1, m2, m3]
 M_list = [M1, M2, M3]
 num_communities = len(sol_list)  # Number of communities
-#############################################
-# Plot biomass change over time
-for i in range(num_communities):
-    sol = sol_list[i]
-    N = N_list[i]
-    C_final = sol.y[:, -1]  # Final abundance
-    # Assign colors
-    colors = (
-        ['red'] * N if i == 0 else
-        ['blue'] * N if i == 1 else
-        ['red'] * N_list[0] + ['blue'] * (N - N_list[0])
-    )
-    # Plot biomass change
-    plt.figure(figsize=(8, 5))
-    for j in range(N):
-        plt.plot(sol.t, sol.y[j], label=f'Species {j+1}', color=colors[j])
-
-    plt.xlabel("Time")
-    plt.ylabel("Biomass (C)")
-    plt.title(f"Change of Biomass Over Time (Community {i+1})")
-    plt.legend()
-    plt.show()
-###### visualization for the seperation between survival and extinction######
 data_to_save = [] 
 for i in range(num_communities):
     C_final = np.array(sol_list[i].y[:, -1])  # shape: (num_species,)
@@ -157,8 +158,8 @@ for i in range(num_communities):
     surviving_CUE = []
     extinct_CUE = []
     # Separate surviving and extinct species based on CUE threshold
-    surviving_CUE = [species_CUE[j] for j in range(len(species_CUE)) if C_final[j] >= 0.1]
-    extinct_CUE = [species_CUE[j] for j in range(len(species_CUE)) if C_final[j] < 0.1]
+    surviving_CUE = [species_CUE[j] for j in range(len(species_CUE)) if C_final[j] >= 0.01]
+    extinct_CUE = [species_CUE[j] for j in range(len(species_CUE)) if C_final[j] < 0.01]
     surviving_species_count = len(surviving_CUE)
 
 
@@ -188,46 +189,30 @@ for i in range(num_communities):
 # After the loop: create a DataFrame and save to CSV
 df_out = pd.DataFrame(data_to_save)
 df_out.to_csv("data/CUE_distribution.csv", index=False)
-############# compute aij ################
-def compute_aij(R, u, l, N, M):
-    dR_dC = np.zeros((M, N))
-
-    for alpha in range(M):
-        for j in range(N):
-            dR_dC[alpha, j] = - R[alpha] * u[j, alpha] + np.sum(R * u[j, :] * l[j, :, alpha])
-    aij = np.dot(u* (1 - λ), dR_dC)
-    return aij
-
-different_aij = []
-for i in range(num_communities):
-    aij = compute_aij( R0_list[i], u_list[i], l_list[i], N_list[i], M_list[i])
-    different_aij.append(aij)
-    # Print mean of interaction coefficients (avoid printing entire list)
-    print(f"Mean interaction coefficient {i+1}: {np.mean(aij):.4f}")
 
 ############### Control R0_3 value ######################
 R0_3_values = np.linspace(0, 5, 50)  # 50 different R0_3 values
 cue_community = []
 
-# Iterate over different R0_3 values
-for R0_3_val in R0_3_values:
-    R0_3 = np.full(M, R0_3_val)  # Ensure R0_3 is an array of size (M,)
-    Y0_3 = np.concatenate([C0_3, R0_3])  # Ensure Y0_3 is correct shape
+# # Iterate over different R0_3 values
+# for R0_3_val in R0_3_values:
+#     R0_3 = np.full(M, R0_3_val)  # Ensure R0_3 is an array of size (M,)
+#     Y0_3 = np.concatenate([C0_3, R0_3])  # Ensure Y0_3 is correct shape
 
-    sol3 = solve_ivp(dCdt_Rdt, t_span, Y0_3, t_eval=t_eval, args=(uu, ll, N3, M, m3, rho3, omega3))
+#     sol3 = solve_ivp(dCdt_Rdt, t_span, Y0_3, t_eval=t_eval, args=(uu, ll, N3, M, m3, rho3, omega3))
 
-    # Compute total CUE integral
-    average_CUE, _ = CUE.compute_community_CUE2(sol3, N3, uu, R0_3, ll, m3)  # Unpack if function returns tuple
+#     # Compute total CUE integral
+#     average_CUE, _ = CUE.compute_community_CUE2(sol3, N3, uu, R0_3, ll, m3)  # Unpack if function returns tuple
 
-    # Store integral value
-    cue_community.append(average_CUE)
+#     # Store integral value
+#     cue_community.append(average_CUE)
 
-# Plotting outside the loop
-plt.figure(figsize=(8, 5))
-plt.plot(R0_3_values, cue_community, marker='o', linestyle='-', color='b')
-plt.xlabel("R0_3 Value (Resource Input Rate)")
-plt.ylabel("Total Numerical Integral of CUE")
-plt.title("Effect of R0_3 on Community CUE")
-plt.grid()
-plt.show()
+# # Plotting outside the loop
+# plt.figure(figsize=(8, 5))
+# plt.plot(R0_3_values, cue_community, marker='o', linestyle='-', color='b')
+# plt.xlabel("R0_3 Value (Resource Input Rate)")
+# plt.ylabel("Total Numerical Integral of CUE")
+# plt.title("Effect of R0_3 on Community CUE")
+# plt.grid()
+# plt.show()
 
